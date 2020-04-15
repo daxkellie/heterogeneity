@@ -19,12 +19,14 @@ rm(list=ls())
 ```{r packages, message = FALSE, warning = FALSE, error = FALSE}
 
 # packages
-library(tidyverse)
-library(lme4)
-library(lmerTest)
-library(MuMIn)
-library(rptR)
-library(brms)
+# library(tidyverse)
+# library(lme4)
+# library(lmerTest)
+# library(MuMIn)
+# library(rptR)
+# library(brms)
+
+pacman::p_load(tidyverse, lme4, lmerTest, MuMIn, brms)
 
 ```
 
@@ -273,10 +275,3 @@ model <- lmer(biomass_Seed ~ Legume * Lab * CSV +
                 (1|Block/Method.comm), 
                 data = data_CSV)
 ```
-
-
-### Test
-```{r}
-# TEST
-```
-
