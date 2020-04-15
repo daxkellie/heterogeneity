@@ -26,7 +26,7 @@ rm(list=ls())
 # library(rptR)
 # library(brms)
 
-pacman::p_load(tidyverse, lme4, lmerTest, MuMIn, brms)
+pacman::p_load(tidyverse, lme4, lmerTest, MuMIn, brms, rptR)
 
 ```
 
@@ -78,8 +78,13 @@ plot_frequencyDist(data_NutNet, "plant.NPK")
 
 Model
 ```{r}
-model <- lmer(plant.NPK ~ TREATMENT + (1|SITE), data = data_NutNet)
+
+data_NutNet$REPLICLATE <- paste0(data_NutNet$SITE, data_NutNet$TREATMENT)
+
+model <- lmer(plant.NPK ~ TREATMENT + (1|SITE) + (1|REPLICLATE), data = data_NutNet)
 summary(model)
+
+modelb <-brm(plant.NPK ~ TREATMENT + (1|SITE) + (1|REPLICLATE), data = data_NutNet)
 
 hist(resid(model)) # Note that there is an outlier
 
