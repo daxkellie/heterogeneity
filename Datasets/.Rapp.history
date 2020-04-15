@@ -1,0 +1,580 @@
+function (object1, object2, ..., mix = FALSE) #
+{#
+    orchard_list <- list(object1, object2, ...)#
+    len <- length(orchard_list)#
+    tables <- lapply(orchard_list, function(x) x$mod_table)#
+    tables <- do.call("rbind", tables)#
+    datas <- lapply(orchard_list, function(x) x$data)#
+    datas <- do.call("rbind", datas)#
+    if (mix == TRUE) {#
+        names <- lapply(orchard_list, function(x) x$data$moderator)#
+        names <- as.vector(unlist(mapply(function(x, y) paste0(x, y), #
+            x = names, y = 1:len)))#
+        datas$moderator <- factor(names)#
+        tables$name <- levels(factor(names))#
+    }#
+    model_results <- list(mod_table = tables, data = datas)#
+    class(model_results) <- "orchard"#
+    return(model_results)#
+}
+submerge(res1, res2, mix = T)
+submerge <- function (object1, object2, ..., mix = FALSE) #
+{#
+    orchard_list <- list(object1, object2, ...)#
+    len <- length(orchard_list)#
+    tables <- lapply(orchard_list, function(x) x$mod_table)#
+    tables <- do.call("rbind", tables)#
+    datas <- lapply(orchard_list, function(x) x$data)#
+    datas <- do.call("rbind", datas)#
+    if (mix == TRUE) {#
+        names <- lapply(orchard_list, function(x) x$data$moderator)#
+        names <- as.vector(unlist(mapply(function(x, y) paste0(x, y), #
+            x = names, y = 1:len)))#
+        datas$moderator <- factor(names)#
+        tables$name <- levels(factor(names))#
+    }#
+    model_results <- list(mod_table = tables, data = datas)#
+    class(model_results) <- "orchard"#
+    return(model_results)#
+}
+submerge(res1, res2, mix = T)
+/0.31000
+0.3/1000
+library(MuMIn)
+options(na.action = "na.fail")#
+#
+fm1 <- lm(y ~ ., data = Cement)#
+dd <- dredge(fm1)#
+subset(dd, delta < 4)
+install.packages("MuMIn")#
+library(MuMIn)#
+eval(metafor:::.MuMIn)
+full <- rma(yi, vi, mods = ~ length + wic + feedback + info + pers + imag + meta,#
+            data=dat, method="ML")
+library(metafor)
+res <- dredge(full, trace=2)#
+subset(res, delta <= 2, recalc.weights=FALSE)
+res <- dredge(full, trace=2)
+full <- rma(yi, vi, mods = ~ length + wic + feedback + info + pers + imag + meta,#
+            data=dat, method="ML")
+library(metafor)#
+dat <- dat.bangertdrowns2004
+full <- rma(yi, vi, mods = ~ length + wic + feedback + info + pers + imag + meta,#
+            data=dat, method="ML")
+dat
+rbind(head(dat, 10), tail(dat, 10))''
+rbind(head(dat, 10), tail(dat, 10))
+dat <- dat[!apply(dat[,c("length", "wic", "feedback", "info", "pers", "imag", "meta")], 1, anyNA),]
+full <- rma(yi, vi, mods = ~ length + wic + feedback + info + pers + imag + meta,#
+            data=dat, method="ML")
+res <- dredge(full, trace=2)#
+subset(res, delta <= 2, recalc.weights=FALSE)
+47/53
+(20+30)/2
+sqrt(20*30)
+120*13.5
+365*0.8
+10502*0.2
+10502*0.1
+0.1(132136/12)
+0.1*(132136/12)
+0.2*(132136/12)
+4400/50
+4400/ 53.61
+4400/53.61
+82* 53.61
+41* 53.61
+41* 46.34
+41* 46.34*0.75
+41* 46.34*0.85
+2*(41* 46.34*0.85)
+(41* 46.34*0.85)
+(41* 46.34)
+(41* 46.34)*0.50
+1*9000/60
+4000*0.85
+4000*0.7
+4000*0.85
+?qlogis
+21/23
+21/2341/43
+41/43
+2539080/3
+2539080*0.3
+28413*3+98907+97607+103907
+13*13*16
+13*3*16
+2436-1878
+624-558
+74000*1.21
+74000*0.8
+(74000*0.8)/12
+0.8*(74000*0.8)/12)
+0.8*(74000*0.8)/12
+74000*1.21*0.8
+75*0.8
+1*3
+sqrt(1^2*3^2)
+75000*0.8
+95*0.8
+install.packages("metaSEM")
+test<-rnorm(20)
+reml(test,0,1)
+library(metaSEM)
+reml(test,0,1)
+test
+reml(test,0,1, data = test)
+reml(test,rep(0,20),rep(0,20), data = test)
+var(test)
+summary(reml(test,rep(0,20),rep(0,20), data = test))
+108282*1.32
+(108282*1.32)/2
+(108282*1.3)/2
+(103282*1.3)/2
+1.1*((103282*1.3)/2)
+116/8
+x <- cbind(1,30, seq(27,33,0.1))
+x
+52*4
+52*1
+2000*100
+9/102
+dnorm(0.95)
+pnorm(0.95)
+qnorm(0.95)
+qnorm(0.975)
+pnorm(1)
+pnorm(0)
+qnorm(0.8413447)
+qnorm(0.8413448)
+exp(1.1)
+exp(1.5)
+exp(0.2)
+exp(-0.2)
+log(0.00000000001/1)
+?relevel
+install.packages("devtools")#
+install.packages("tidyverse")#
+install.packages("metafor")#
+install.packages("patchwork")#
+install.packages("R.rsp")#
+#
+devtools::install_github("itchyshin/orchard_plot", subdir = "orchaRd", force = TRUE, build_vignettes = TRUE)#
+#
+library(orchaRd)#
+library(patchwork)#
+library(tidyverse)#
+library(metafor)
+devtools::install_github("itchyshin/orchard_plot", subdir = "orchaRd", force = TRUE, build_vignettes = TRUE)#
+#
+library(orchaRd)#
+library(patchwork)#
+library(tidyverse)#
+library(metafor)
+vignette("orchaRd")
+english <- escalc(measure = "SMD", n1i = NStartControl, sd1i = SD_C, m1i = MeanC,#
+n2i = NStartExpt, sd2i = SD_E, m2i = MeanE, var.names = c("SMD", "vSMD"), data = english)#
+english_MA_int <- rma.mv(yi = SMD, V = vSMD, random = list(~1 | StudyNo, ~1 | EffectID), data = english)#
+summary(english_MA_int)#
+#>
+orchard_plot(english_MA_int, mod = "Int", xlab = "Standardised mean difference", transfm = "none")
+res1 <- mod_results(english_MA_int, mod = "Int") print(res1)
+devtools::install_github("itchyshin/orchard_plot", subdir = "orchaRd", force = TRUE, build_vignettes = TRUE)#
+#
+library(orchaRd)#
+library(patchwork)#
+library(tidyverse)#
+library(metafor)
+res1 <- mod_results(english_MA_int, mod = "Int") print(res1)
+english <- escalc(measure = "SMD", n1i = NStartControl, sd1i = SD_C, m1i = MeanC,#
+n2i = NStartExpt, sd2i = SD_E, m2i = MeanE, var.names = c("SMD", "vSMD"), data = english)#
+english_MA_int <- rma.mv(yi = SMD, V = vSMD, random = list(~1 | StudyNo, ~1 | EffectID), data = english)#
+summary(english_MA_int)#
+#>
+res1 <- mod_results(english_MA_int, mod = "Int") print(res1)
+res1 <- mod_results(english_MA_int, mod = "Int")
+devtools::install_github("itchyshin/orchard_plot", subdir = "orchaRd", force = TRUE, build_vignettes = TRUE)#
+#
+library(orchaRd)#
+library(patchwork)#
+library(tidyverse)#
+library(metafor)
+english <- escalc(measure = "SMD", n1i = NStartControl, sd1i = SD_C, m1i = MeanC,                  n2i = NStartExpt, sd2i = SD_E, m2i = MeanE, var.names = c("SMD", "vSMD"), data = english)english_MA_int <- rma.mv(yi = SMD, V = vSMD, random = list(~1 | StudyNo, ~1 | EffectID), data = english)summary(english_MA_int)
+orchard_plot(english_MA_int, mod = "Int", xlab = "Standardised mean difference", transfm = "none")
+sqrt_raw_mu <- function(mu, var){#
+  raw_mu <- mu^2 + var#
+  return(raw_mu)#
+}#
+# delta method 1st order = var(x)*(f(x)')^2#
+# delta method 2nd order = var(x)*(f(x)')^2 + 0.5*(f(x)'')^2*var(x)^2#
+sqrt_raw_var1<- function(mu, var){#
+  raw_var <- var*4*mu^2#
+  return(raw_var)#
+}#
+sqrt_raw_var2<- function(mu, var){#
+  raw_var <- var*4*mu^2 + 2*var^2#
+  return(raw_var)#
+}#
+tdat <- rnorm(10000000, 0.5, sqrt(0.1))#
+mean <- mean(tdat^2)#
+variance <- var(tdat^2)#
+mean#
+variance#
+sqrt_raw_mu(0.5, 0.1)#
+sqrt_raw_var1(0.5, 0.1)#
+sqrt_raw_var2(0.5, 0.1)#
+tdat <- rnorm(10000000, 0.5, sqrt(0.5))#
+mean <- mean(tdat^2)#
+variance <- var(tdat^2)#
+mean#
+variance#
+sqrt_raw_mu(0.5, 0.5)#
+sqrt_raw_var1(0.5, 0.5)#
+sqrt_raw_var2(0.5, 0.5)
+1/2000*log(10)
+(1/2000*log(10))^2
+var*(1/2000*log(10))^2
+1.3*(1/2000*log(10))^2
+1.3*(1/(2000*log(10)))^2
+(1/(2000*log(10)))^2
+exp(2)
+exp(10)
+10^(2)
+exp(2/2.303)
+exp(2*2.303)
+e
+exp()
+exp(1)
+10^2
+log(10)
+install.packages("HDInterva")
+install.packages("HDInterval")
+library(HDInterval)
+tst <- rgamma(1e5, 2.5, 2)#
+hdi(tst)#
+hdi(tst, credMass=0.8)# For comparison, the symmetrical 80% CrI:#
+quantile(tst, c(0.1,0.9))
+tst <- rlnorm(1e5, 1, 3)#
+hdi(tst)#
+hdi(tst, credMass=0.8)# For comparison, the symmetrical 80% CrI:#
+quantile(tst, c(0.1,0.9))
+tst <- rlnorm(1e5, 1, 3)#
+hdi(tst)#
+hdi(tst, credMass=0.95)# For comparison, the symmetrical 80% CrI:#
+quantile(tst, c(0.025,0.975))
+tst <- rlnorm(1e5, 1, 3)#
+hdi(tst)#
+hdi(tst, credMass=0.01)# For comparison, the symmetrical 80% CrI:#
+quantile(tst, c(0.1,0.9))
+tst <- rlnorm(1e5, 1, 3)#
+hdi(tst)#
+hdi(tst, credMass=0.000000000000000001)# For comparison, the symmetrical 80% CrI:#
+quantile(tst, c(0.025,0.975))
+tst <- rlnorm(1e5, 1, 3)#
+hdi(tst)#
+hdi(tst, credMass=1e5)# For comparison, the symmetrical 80% CrI:#
+quantile(tst, c(0.025,0.975))
+tst <- rlnorm(1-e5, 1, 3)#
+hdi(tst)#
+hdi(tst, credMass=1e5)# For comparison, the symmetrical 80% CrI:#
+quantile(tst, c(0.025,0.975))
+1e-5
+tst <- rlnorm(1e-5, 1, 3)#
+hdi(tst)#
+hdi(tst, credMass=1e5)# For comparison, the symmetrical 80% CrI:#
+quantile(tst, c(0.025,0.975))
+tst <- rlnorm(0.00005, 1, 3)#
+hdi(tst)#
+hdi(tst, credMass=1e5)# For comparison, the symmetrical 80% CrI:#
+quantile(tst, c(0.025,0.975))
+tst <- rlnorm(1e5, 1, 3)#
+hdi(tst)#
+hdi(tst, credMass=1e-5)# For comparison, the symmetrical 80% CrI:#
+quantile(tst, c(0.025,0.975))
+?hdi
+tst <- rlnorm(1e5, 1, 3)#
+hdi(tst)#
+hdi(tst, credMass=1)# For comparison, the symmetrical 80% CrI:#
+quantile(tst, c(0.025,0.975))
+11|12
+1\1
+1|1
+1 = 1
+1 == 1
+1 = 1
+1 <- 1
+10^(1+1.4)
+10^(1+1.4)/10^(1)
+sqrt(0.9^2 + 0.9^2)
+(40000/12)*(2/3)*10
+(40000/12)*(2/3)*11
+50*8*6
+?anyNA
+LL <- list(1:5, c(NA, 5:8), c("A","NA"), c("a", NA_character_))#
+L2 <- LL[c(1,3)]#
+sapply(LL, anyNA)
+LL <- list(1:5, c(NA, 5:8), c("A","NA"), c("a", NA_character_))#
+L2 <- LL[c(1,3)]#
+sapply(LL, NA)
+LL <- list(1:5, c(NA, 5:8), c("A","NA"), c("a", NA_character_))#
+L2 <- LL[c(1,3)]#
+sapply(LL, anyNA)
+LL
+142533+168117+163132
+2^2/2
+(2^2)/2
+(10^2)/2
+10^2/2
+test<-(10000, 0,10)
+test<-rnorm(10000, 0,10)
+ztest<-scale(test)
+sd(test)
+sd(ztest)
+235/6
+exp(-1.5)
+1-exp(-1.5)
+1-exp(-0.2)
+choose(6,2)
+test<-rnorm(1000000)
+var(test^2)
+var(test)
+skew(test)
+skewness(test)
+var(test^3)
+var(test^4)
+0.2/(0.5^2)
+(0.2*5)/((0.5*5)^2)
+(20)/((100)^2)
+(20*5)/((100*5)^2)
+124000/130
+120*(124000/130)
+3000/50000
+40000/50000
+rm(list = ls())#
+# set working directory to the 'Datasets' folder#
+setwd("/Users/itchyshin/Dropbox (Personal)/Project2/Tim P/heterogeneity/Project/Datasets")#
+# load data#
+data_Dispersal <- read.table("BottomUpTopDown/data/data_dispersal_all_species.txt",#
+                         header = TRUE, sep = "\t", fill = TRUE)#
+data_CSV <- read.csv("CSV_microcosms/data/milcu_etal2017.csv", header = TRUE)#
+data_NutNet <- read.csv("NutNet/data/Model2.SEM.plot.data.csv", header = TRUE)#
+data_biomass <- read.csv("RichnessDrought/data/biomass_1.2.csv", header = TRUE)#
+# packages#
+library(tidyverse)#
+library(lme4)#
+library(lmerTest)#
+library(MuMIn)#
+library(rptR)
+install.pacakges("rptR")
+install.packages("rptR")
+# packages#
+library(tidyverse)#
+library(lme4)#
+library(lmerTest)#
+library(MuMIn)#
+library(rptR)#
+#|----------------------- ### Viewing our data sets ### ------------------------|#
+# Bottom Up & Top Down#
+data_Dispersal %>% glimpse()#
+data_Dispersal %>% head(10)#
+# CSV microcosms#
+data_CSV %>% glimpse()#
+data_CSV %>% head(100)#
+# Nutrient Network#
+data_NutNet %>% glimpse()#
+data_NutNet %>% head(5)#
+# Biodiversity x Drought#
+data_biomass %>% glimpse()#
+data_biomass %>% head(5)#
+#------------------------------- Disperal model ---------------------------------------#
+# main DV: number of residents (individuals that did not move from original block)#
+# main DV: number of dispersers (individuals that did move out of their original block)#
+model <- glmer(as.factor(no_residents) ~ RA * PRED +#
+                 (1|block/relevant_taxon/species) + (1|relevant_taxon) + (1|lab), #
+               family = binomial, control = glmerControl(optimizer = "bobyqa"),#
+               data = data_Dispersal)#
+model <- glmer(as.factor(no_dispersers) ~ RA * PRED +#
+                 (1|block/relevant_taxon/species) + (1|relevant_taxon) + (1|lab), #
+               family = binomial, control = glmerControl(optimizer = "bobyqa"),#
+               data = data_Dispersal)#
+anova(model)#
+summary(model)#
+# Possible issues:#
+# Overdispersion was accounted for by additionally including an observation level random effect.#
+# does this mean (1|replicate)? What does "observation level" mean?#
+# As random effects, we included experimental block within species within taxon#
+# is my random effect equal to what this explains?#
+#--------------------------- NutNet model ---------------------------------------#
+str(data_NutNet)#
+# Milcu et al. model#
+# Test effect of Herbivory (FENCE; yes/no) & Eutrophication (Fertilizer; yes/no) on C, N, P & K#
+# They use Log Response Ratio of total NPK between Control & Fertilizer #
+# treatment as Dependent Variable#
+# Model includes treatment variable Fence, as well as environmental measures of MAP, MAT and SOLAR.INS#
+# MAP = mean annual precipitation#
+# MAT = mean annual temperature#
+# SOLAR.INS = solar insolation#
+# Used AIC model comparison to determine final model#
+# get sum of DV#
+table_NPK_Fert <- data_NutNet %>% #
+  group_by(SITE, NPK.ADDED, FENCE, MAP, MAT, SOLAR.INS, N.DEPOSITION) %>% #
+  select(SITE, NPK.ADDED, plant.NPK, plant.N, plant.P, plant.K) %>%#
+  summarise(total.NPK = sum(plant.NPK))#
+# Prepare table for pivot_wider()#
+table_NPK_Fert$NPK.ADDED <- as.character(table_NPK_Fert$NPK.ADDED)#
+table_NPK_Fert$NPK.ADDED <- recode(table_NPK_Fert$NPK.ADDED, "0" = "Control", '1' = "Fertilizer")#
+# Calulate Log Response Ratio of DV (Control vs Fertilizer effect)#
+table_NPK_Fert <- #
+  table_NPK_Fert %>% #
+  pivot_wider(names_from = NPK.ADDED, values_from = total.NPK) %>%#
+  group_by(SITE) %>%#
+  mutate(#
+    LRR_Fertilizer = log(Fertilizer/Control)#
+  )
+model <- lmer(LRR_Fertilizer ~ FENCE + MAT + MAT + SOLAR.INS + N.DEPOSITION + FENCE:MAT, #
+              data = table_NPK_Fert)#
+anova(model)#
+summary(model)
+str(data_NutNet)#
+model <- lmer(plant.NPK ~ FENCE*NPK.ADDED + MAP + MAT + SOLAR.INS + (1|SITE), #
+              data = data_NutNet)#
+anova(model)#
+summary(model)#
+hist(resid(model)) # Note that there is an outlier
+# Frequency distribution#
+plot_frequencyDist <- function(df, variable) {#
+  fd.histogram <- ggplot(df, aes_string(x = variable)) + #
+    guides(fill = F) # to remove the legend#
+  fd.histogram + #
+    geom_histogram(binwidth = .4) + # binwidth tidies the data a bit#
+    labs(x = variable, y = "Frequency")#
+}#
+plot_frequencyDist(data_NutNet, "plant.NPK")
+# repeatability estimate#
+rep2 <- rptPoisson(plant.NPK ~ FENCE*NPK.ADDED + MAP + MAT + SOLAR.INS + (1|SITE),#
+                 grname = c("SITE", "Fixed"), #
+                 data = data_NutNet,#
+                 # link = "log",#
+                 nboot = 10, parallel = TRUE, adjusted = FALSE)#
+rep2
+rep2 <- rptGaussian(plant.NPK ~ FENCE*NPK.ADDED + MAP + MAT + SOLAR.INS + (1|SITE),#
+                 grname = c("SITE", "Fixed"), #
+                 data = data_NutNet,#
+                 # link = "log",#
+                 nboot = 10, parallel = TRUE, adjusted = FALSE)
+rep2
+?rpt
+rep2 <- rptGaussian(plant.NPK ~ FENCE*NPK.ADDED + MAP + MAT + SOLAR.INS + (1|SITE),#
+                 grname = c("SITE", "Fixed"), #
+                 data = data_NutNet,#
+                 # link = "log",#
+                 nboot = 10, parallel = FALSE, adjusted = FALSE)#
+rep2
+# repeatability estimate#
+rep2 <- rptGaussian(plant.NPK ~ FENCE*NPK.ADDED + MAP + MAT + SOLAR.INS + (1|SITE),#
+                 grname = c("SITE", "Fixed"), #
+                 data = data_NutNet,#
+                 # link = "log",#
+                 nboot = 10, parallel = FALSE, adjusted = FALSE)#
+rep2
+rep2 <- rptGaussian(plant.NPK ~ FENCE*NPK.ADDED + MAP + MAT + SOLAR.INS + (1|SITE),#
+                 grname = c("SITE", "Fixed"), #
+                 data = data_NutNet,#
+                 ratio = TRUE,#
+                 # link = "log",#
+                 nboot = 100, parallel = TRUE, adjusted = FALSE)
+rep2 <- rptGaussian(plant.NPK ~ FENCE*NPK.ADDED + MAP + MAT + SOLAR.INS + (1|SITE),#
+                 grname = c("SITE", "Fixed"), #
+                 data = data_NutNet,#
+                 ratio = Also,#
+                 # link = "log",#
+                 nboot = 100, parallel = TRUE, adjusted = FALSE)#
+rep2
+var(data_NutNet$plant.NPK)
+rep2 <- rptGaussian(plant.NPK ~ FENCE*NPK.ADDED + MAP + MAT + SOLAR.INS + (1|SITE),#
+                 grname = c("SITE", "Fixed"), #
+                 data = data_NutNet,#
+                 ratio = TRUE,#
+                 # link = "log",#
+                 nboot = 100, parallel = TRUE, adjusted = FALSE)#
+rep2
+model<- lmer(lant.NPK ~ FENCE*NPK.ADDED + MAP + MAT + SOLAR.INS + (1|SITE), data = data_NutNet)#
+summary(model)
+model<- lmer(lant.NPK ~ TREATMENT + (1|SITE), data = data_NutNet)#
+summary(model)
+model<- lmer(lant.NPK ~ TREATMENT + (1|SITE), data = data_NutNet)
+model<- lmer(plant.NPK ~ TREATMENT + (1|SITE), data = data_NutNet)
+summary(model)
+var(data_NatNet$plant.NPK)
+var(data_NutNet$plant.NPK)
+rep2 <- rptGaussian(plant.NPK ~ FENCE*NPK.ADDED + MAP + MAT + SOLAR.INS + (1|SITE),#
+                 grname = c("SITE", "Fixed"), #
+                 data = data_NutNet,#
+                 ratio = FALSE,#
+                 # link = "log",#
+                 nboot = 100, parallel = TRUE, adjusted = FALSE)#
+rep2
+rep2 <- rptGaussian(plant.NPK ~ TREATMENT + (1|SITE),#
+                 grname = c("SITE", "Fixed"), #
+                 data = data_NutNet,#
+                 ratio = FALSE,#
+                 # link = "log",#
+                 nboot = 100, parallel = TRUE, adjusted = FALSE)#
+rep2
+2.16/2.61
+0..05/2.61
+0.05/2.61
+str(data_CSV)#
+data_CSV <- rename(data_CSV,#
+                   Legume = Treat..legume.,#
+                   CSV = Treat..controlled.systematic.variabiliy.,#
+                   biomass_Seed = Biom.dm..g...seed.,#
+                   biomass_Shoot = Biom.dm..g...shoot.,#
+                   biomass_Root = Biom.dm..g...root.,#
+                   biomass_Total = Biom.dm..g...total.,#
+                   ratio_RootShoot = Root.shoot,#
+                   N.shoot = N.shoot....,#
+                   C.shoot = C.shoot....#
+                   )#
+# First they removed outliers. I'll keep these in.#
+model <- lmer(biomass_Seed ~ Legume * Lab * CSV + #
+                (1|Block/Method.comm), #
+                data = data_CSV)#
+anova(model)#
+summary(model)#
+plot_frequencyDist(data_CSV, "biomass_Seed")
+data_CSV
+str(data_CSV)
+model <- lmer(biomass_Seed ~ Legume*Method.comm + (1|Lab) + (1|CSV)+#
+                (1|past0(Block,Lab)), #
+                data = data_CSV)#
+summary(model)
+model <- lmer(biomass_Seed ~ Legume*Method.comm + (1|Lab) + (1|CSV)+#
+                (1|past0(Block,Lab)), #
+                data = data_CSV)
+model <- lmer(biomass_Seed ~ Legume*Method.comm + (1|Lab) + (1|CSV)+#
+                (1|paste0(Block,Lab)), #
+                data = data_CSV)
+data_CSV$Replicate <-  paste0(data_CSV $Block, data_CSV $Lab)
+model <- lmer(biomass_Seed ~ Legume*Method.comm + (1|Lab) + (1|CSV)+#
+                (1| Replicate)), #
+                data = data_CSV)#
+summary(model)
+data$Legume
+data_CSV$Legume
+data_CSV$Method.comm
+#Shinichi#
+data_CSV$Replicate <-  paste0(data_CSV $Block, data_CSV$Lab)#
+#
+model <- lmer(biomass_Seed ~ Legume*Method.comm + (1|Lab) + (1|CSV)+#
+                (1| Replicate), #
+                data = data_CSV)#
+summary(model)
+var(data_CSV$biommass_Seed)
+var(data_CSV$biomass_Seed)
+var(data_CSV$biomass_Seed,rm.na = T)
+var(data_CSV$biomass_Seed,na.rm = T)
+1.36-(0.003+0.753+0.053+0.327)
+(0.003+0.753+0.053+0.327)
+0.224/1.36
+0.753/1.36

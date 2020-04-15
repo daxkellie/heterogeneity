@@ -1,0 +1,276 @@
+---
+title: "Biological Heterogeneity"
+author: "DK"
+date: "01/04/2020"
+output:
+  html_document:
+    highlight: pygments
+    theme: lumen
+    toc: yes
+    toc_float: yes
+editor_options: 
+  chunk_output_type: inline
+---
+
+```{r fresh list of bel air, echo = FALSE}
+rm(list=ls())
+```
+
+```{r packages, message = FALSE, warning = FALSE, error = FALSE}
+
+# packages
+library(tidyverse)
+library(lme4)
+library(lmerTest)
+library(MuMIn)
+library(rptR)
+library(brms)
+
+```
+
+
+# Load Data Sets
+
+```{r}
+data_CSV <- read.csv("Datasets/CSV_microcosms/data/milcu_etal2017.csv", header = TRUE)
+data_NutNet <- read.csv("Datasets/NutNet/data/Model2.SEM.plot.data.csv", header = TRUE)
+data_biomass <- read.csv("Datasets/RichnessDrought/data/biomass_1.2.csv", header = TRUE)
+
+```
+
+
+# Nutrient Network (NutNet)
+Anderson et al. (2018) model </b>
+
+Test effect of Herbivory (FENCE; yes/no) & Eutrophication (Fertilizer; yes/no) on C, N, P & K
+
+Model includes treatment variable Fence, as well as environmental measures of MAP, MAT and SOLAR.INS  
+MAP = mean annual precipitation  
+MAT = mean annual temperature  
+SOLAR.INS = solar insolation  
+
+Used AIC model comparison to determine final model
+
+```{r}
+data_NutNet %>% glimpse()
+data_NutNet %>% head(5)
+```
+
+
+## Repeatability Analysis
+
+Frequency Distribution
+```{r}
+plot_frequencyDist <- function(df, variable) {
+  
+  fd.histogram <- ggplot(df, aes_string(x = variable)) + 
+    guides(fill = F) # to remove the legend
+  
+  fd.histogram + 
+    geom_histogram(binwidth = .4) + # binwidth tidies the data a bit
+    labs(x = variable, y = "Frequency")
+  
+}
+plot_frequencyDist(data_NutNet, "plant.NPK")
+```
+
+Model
+```{r}
+model <- lmer(plant.NPK ~ TREATMENT + (1|SITE), data = data_NutNet)
+summary(model)
+
+hist(resid(model)) # Note that there is an outlier
+
+# Total Variance
+var(data_NutNet$plant.NPK)
+
+
+```
+
+Repeatability
+```{r}
+rep2 <- rptGaussian(plant.NPK ~ TREATMENT + (1|SITE),
+                 grname = c("SITE", "Fixed", "Residual"), 
+                 data = data_NutNet,
+                 ratio = FALSE,
+                 nboot = 100, parallel = TRUE, adjusted = FALSE)
+
+rep2
+```
+
+
+## Plot Variance Components
+Data wrangling
+```{r}
+varTable_NutNet <- as.data.frame(rep2$R) # extract variance components in dataframe
+varTable_NutNet <- varTable_NutNet %>% 
+  rename(., Location = SITE) %>% # rename SITE
+  mutate(
+    Data = paste("NutNet") # Add data identifier column
+  ) %>%
+  pivot_longer(-Data, names_to = "Components", values_to = "Variance") # flip the table
+
+# add percent of total variance column
+varTable_NutNet$percentVar <- varTable_NutNet$Variance/(sum(varTable_NutNet$Variance))*100 
+```
+
+*Plot*
+```{r}
+varTable_NutNet %>%
+  ggplot(aes(x = Data, y = percentVar, fill = Components)) + 
+  geom_bar(stat = "identity", position = "stack", width = .4) +
+  geom_text(aes(label = paste0(as.character(Components), "\n",  round(percentVar, 0), "%")), 
+            position = "stack", hjust = 1, size = 2, check_overlap = FALSE) + 
+    scale_fill_brewer(palette = "Pastel1", na.value = "grey70") + 
+    coord_flip() + 
+    theme_minimal(base_size = 12) + 
+    theme(axis.title = element_blank(), panel.grid.major.y = element_blank(), 
+          legend.position = "top")
+
+```
+
+
+# Controlled Systematic Variability (CSV)
+Microcosms experiment  
+Milcu et al. (2018)  
+Sites: 14 European Labs  
+
+<br/>
+
+Tested effect of presence of legume species on grass species. Introducted genetic and environmental variability.  <br/>
+
+Rename columns
+```{r}
+data_CSV <- rename(data_CSV,
+                   Legume = Treat..legume.,
+                   CSV = Treat..controlled.systematic.variabiliy.,
+                   biomass_Seed = Biom.dm..g...seed.,
+                   biomass_Shoot = Biom.dm..g...shoot.,
+                   biomass_Root = Biom.dm..g...root.,
+                   biomass_Total = Biom.dm..g...total.,
+                   ratio_RootShoot = Root.shoot,
+                   N.shoot = N.shoot....,
+                   C.shoot = C.shoot....
+                   )
+
+# They removed outliers but I'll keep these in.
+```
+
+```{r}
+data_CSV %>% glimpse()
+data_CSV %>% head(10)
+```
+
+
+## Repeatability Analysis
+
+Shinichi's model
+```{r}
+data_CSV$Replicate <-  paste0(data_CSV$Block, data_CSV$Lab) # add block x lab variable
+
+model <- lmer(biomass_Seed ~ Legume*Method.comm + (1|Lab) + (1|CSV)+
+                (1| Replicate), 
+                data = data_CSV)
+                
+summary(model)                
+```
+Frequency distribution of data
+```{r}
+plot_frequencyDist(data_CSV, "biomass_Seed")
+```
+
+```{r}
+rep3 <- rptGaussian(biomass_Seed ~ Legume*Method.comm + (1|Lab) + (1|CSV) + (1| Replicate),
+                   grname = c("Lab", "CSV", "Replicate", "Fixed", "Residual"), 
+                   data = data_CSV,
+                   ratio = FALSE,
+                   nboot = 10, parallel = FALSE, adjusted = FALSE)
+
+rep3
+```
+
+## Plot Variance Components
+Data wrangling
+```{r}
+varTable_CSV <- as.data.frame(rep3$R) # extract variance components in dataframe
+varTable_CSV <- varTable_CSV %>% 
+  rename(., Location = Lab) %>% # rename SITE
+  mutate(
+    Data = paste("CSV") # Add data identifier column
+  ) %>%
+  pivot_longer(-Data, names_to = "Components", values_to = "Variance") # flip the table
+
+# add percent of total variance column
+varTable_CSV$percentVar <- varTable_CSV$Variance/(sum(varTable_CSV$Variance))*100 
+```
+
+
+# Biodiversity x Drought
+```{r}
+data_biomass %>% glimpse()
+data_biomass %>% head(5)
+```
+
+# PLOT
+```{r}
+varTable <- rbind(varTable_NutNet, varTable_CSV)
+```
+```{r}
+varTable %>%
+  ggplot(aes(x = Data, y = percentVar, fill = Components)) + 
+  geom_bar(stat = "identity", position = "stack", width = .4) +
+  geom_text(aes(label = paste0(as.character(Components), "\n",  round(percentVar, 0), "%")), 
+            position = "stack", hjust = 1, size = 2, check_overlap = FALSE) + 
+    scale_fill_brewer(palette = "Pastel1", na.value = "grey70") + 
+    coord_flip() + 
+    theme_minimal(base_size = 12) + 
+    theme(axis.title = element_blank(), panel.grid.major.y = element_blank(), 
+          legend.position = "top")
+
+```
+
+
+# Replicated Models from Papers
+
+## Anderson et al. (2018)
+They use Log Response Ratio of total NPK between Control & Fertilizer treatment as Dependent Variable
+```{r}
+# get sum of DV
+table_NPK_Fert <- data_NutNet %>% 
+  group_by(SITE, NPK.ADDED, FENCE, MAP, MAT, SOLAR.INS, N.DEPOSITION) %>% 
+  select(SITE, NPK.ADDED, plant.NPK, plant.N, plant.P, plant.K) %>%
+  summarise(total.NPK = sum(plant.NPK))
+
+# Prepare table for pivot_wider()
+table_NPK_Fert$NPK.ADDED <- as.character(table_NPK_Fert$NPK.ADDED)
+table_NPK_Fert$NPK.ADDED <- recode(table_NPK_Fert$NPK.ADDED, "0" = "Control", '1' = "Fertilizer")
+
+# Calulate Log Response Ratio of DV (Control vs Fertilizer effect)
+table_NPK_Fert <- 
+  table_NPK_Fert %>% 
+  pivot_wider(names_from = NPK.ADDED, values_from = total.NPK) %>%
+  group_by(SITE) %>%
+  mutate(
+    LRR_Fertilizer = log(Fertilizer/Control)
+  )
+```
+
+```{r}
+# Anderson et al. model
+model <- lm(LRR_Fertilizer ~ FENCE + MAT + MAT + SOLAR.INS + N.DEPOSITION + FENCE:MAT, 
+              data = table_NPK_Fert)
+
+anova(model)
+summary(model)
+```
+
+
+
+## Milcu et al. (2018)
+#### Their model
+```{r}
+model <- lmer(biomass_Seed ~ Legume * Lab * CSV + 
+                (1|Block/Method.comm), 
+                data = data_CSV)
+```
+
