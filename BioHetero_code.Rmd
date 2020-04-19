@@ -26,8 +26,12 @@ rm(list=ls())
 # library(rptR)
 # library(brms)
 
-pacman::p_load(tidyverse, lme4, lmerTest, MuMIn, brms, rptR)
+pacman::p_load(tidyverse, lme4, lmerTest, MuMIn, rstan, brms, rptR, tidybayes)
 
+# helping running rstan (brms) models
+
+options(mc.cores = parallel::detectCores())
+rstan_options(auto_write = TRUE)
 ```
 
 
@@ -84,13 +88,40 @@ data_NutNet$REPLICLATE <- paste0(data_NutNet$SITE, data_NutNet$TREATMENT)
 model <- lmer(plant.NPK ~ TREATMENT + (1|SITE) + (1|REPLICLATE), data = data_NutNet)
 summary(model)
 
-modelb <-brm(plant.NPK ~ TREATMENT + (1|SITE) + (1|REPLICLATE), data = data_NutNet)
-
 hist(resid(model)) # Note that there is an outlier
 
 # Total Variance
 var(data_NutNet$plant.NPK)
 
+# Baysian model
+modelb <-brm(plant.NPK ~ TREATMENT + (1|SITE) + (1|REPLICLATE), data = data_NutNet,
+             chains = 2, cores = 2)
+
+summary(modelb)
+
+bayes_R2(modelb)
+
+get_variables(modelb)
+
+# getting posteior of random effects for each
+#blups <- ranef(modelb, summary = F)
+
+# your variance component
+post <- posterior_samples(modelb)
+names(post)
+
+# these three are important
+#"sd_REPLICLATE__Intercept" 
+#"sd_SITE__Intercept"  
+#"sigma" 
+
+# we need to caculate variance for fixed effects - this is not so easy
+
+# Dax - go to here (not all exp and code are useful)
+# https://github.com/paul-buerkner/brms
+# https://mjskay.github.io/tidybayes/articles/tidy-brms.html
+#https://www.rensvandeschoot.com/tutorials/brms-started/
+# and learn and do more exploration with this and other ones
 
 ```
 
