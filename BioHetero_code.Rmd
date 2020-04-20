@@ -154,6 +154,12 @@ post_mat %>% data.frame %>% mutate(V_all = V_rep + V_site + V_res + V_fix,
 #https://www.rensvandeschoot.com/tutorials/brms-started/
 # and learn and do more exploration with this and other ones
 
+mean(V_rep) # this is posterior mean (variance of random effect estimate)
+posterior.mode(V_rep) # posterior mode because variation is not normally distributed
+
+# post_mat note:
+#posterior should add up to one
+
 ```
 
 Repeatability
