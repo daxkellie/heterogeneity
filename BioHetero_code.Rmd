@@ -26,7 +26,7 @@ rm(list=ls())
 # library(rptR)
 # library(brms)
 
-pacman::p_load(tidyverse, lme4, lmerTest, MuMIn, rstan, brms, rptR, tidybayes)
+pacman::p_load(tidyverse, lme4, lmerTest, MuMIn, rstan, brms, rptR, tidybayes, coda)
 
 # helping running rstan (brms) models
 
@@ -41,6 +41,8 @@ rstan_options(auto_write = TRUE)
 data_CSV <- read.csv("Datasets/CSV_microcosms/data/milcu_etal2017.csv", header = TRUE)
 data_NutNet <- read.csv("Datasets/NutNet/data/Model2.SEM.plot.data.csv", header = TRUE)
 data_biomass <- read.csv("Datasets/RichnessDrought/data/biomass_1.2.csv", header = TRUE)
+# more to add here
+
 
 ```
 
@@ -95,27 +97,56 @@ var(data_NutNet$plant.NPK)
 
 # Baysian model
 modelb <-brm(plant.NPK ~ TREATMENT + (1|SITE) + (1|REPLICLATE), data = data_NutNet,
-             chains = 2, cores = 2)
+             chains = 2, cores = 2) # you can do more but 2 chains will be fine
 
 summary(modelb)
 
+# I have not used brms for a while - so testing a few functions
 bayes_R2(modelb)
-
 get_variables(modelb)
 
 # getting posteior of random effects for each
 #blups <- ranef(modelb, summary = F)
 
-# your variance component
+# get all posteior samples
 post <- posterior_samples(modelb)
 names(post)
 
 # these three are important
-#"sd_REPLICLATE__Intercept" 
-#"sd_SITE__Intercept"  
-#"sigma" 
+# [1] "b_Intercept"                                  "b_TREATMENTFence"                            
+#  [3] "b_TREATMENTNPK"                               "b_TREATMENTNPK_Fence"                        
+#  [5] "sd_REPLICLATE__Intercept"                     "sd_SITE__Intercept"                          
+#  [7] "sigma"         
+
+# we get what we need - for ranomd effect
+V_rep <-post$sd_REPLICLATE__Intercept^2 # making it varaince
+V_site <-post$sd_SITE__Intercept^2
+V_res <- post$sigma^2
 
 # we need to caculate variance for fixed effects - this is not so easy
+# get a poistior for fixed effect bits (you need to get this as one - it will be difficult to decompose these 0 why?)
+# I cannot seem to get a model matrix from brms so I am going to use lmer
+# get a data frame of different posterior of fixed effects
+post_fix <- as.data.frame(t(post[,1:4]))
+
+# get a posteior of fixed effects
+V_fix <-  map_dbl(post_fix, ~ var(as.vector(. %*% t(model@pp$X))) )
+
+# mcmc object (from coda package)
+post_mat <- as.mcmc(data.frame(V_rep, V_site, V_res, V_fix, row.names = NULL))
+
+summary(post_mat)
+plot(post_mat)
+
+post_mat %>% data.frame %>% mutate(V_all = V_rep + V_site + V_res + V_fix,
+                                   P_rep = V_rep/(V_rep + V_site + V_res + V_fix),
+                                   P_site = V_site/(V_rep + V_site + V_res + V_fix),
+                                   P_res = V_res/(V_rep + V_site + V_res + V_fix),
+                                   P_fix = V_fix/(V_rep + V_site + V_res + V_fix),
+                                   P_all = P_rep + P_site + P_res + P_fix) %>% tibble ->  post_mat2
+
+# Dax to make figure
+
 
 # Dax - go to here (not all exp and code are useful)
 # https://github.com/paul-buerkner/brms
