@@ -82,21 +82,25 @@ plot_frequencyDist <- function(df, variable) {
 plot_frequencyDist(data_NutNet, "plant.NPK")
 ```
 
-Model
+### Frequentist Model
 ```{r}
+# REPLICATE variable
+data_NutNet$REPLICATE <- paste0(data_NutNet$SITE, data_NutNet$TREATMENT)
 
-data_NutNet$REPLICLATE <- paste0(data_NutNet$SITE, data_NutNet$TREATMENT)
-
-model <- lmer(plant.NPK ~ TREATMENT + (1|SITE) + (1|REPLICLATE), data = data_NutNet)
+# Frequentist model
+model <- lmer(plant.NPK ~ TREATMENT + (1|SITE) + (1|REPLICATE), data = data_NutNet)
 summary(model)
 
 hist(resid(model)) # Note that there is an outlier
 
 # Total Variance
 var(data_NutNet$plant.NPK)
+```
 
-# Baysian model
-modelb <-brm(plant.NPK ~ TREATMENT + (1|SITE) + (1|REPLICLATE), data = data_NutNet,
+### Bayesian Model
+```{r}
+# Bayesian model
+modelb <-brm(plant.NPK ~ TREATMENT + (1|SITE) + (1|REPLICATE), data = data_NutNet,
              chains = 2, cores = 2) # you can do more but 2 chains will be fine
 
 summary(modelb)
@@ -104,11 +108,14 @@ summary(modelb)
 # I have not used brms for a while - so testing a few functions
 bayes_R2(modelb)
 get_variables(modelb)
+```
 
-# getting posteior of random effects for each
-#blups <- ranef(modelb, summary = F)
 
-# get all posteior samples
+```{r}
+# getting posterior of random effects for each
+# blups <- ranef(modelb, summary = F)
+
+# get all posterior samples
 post <- posterior_samples(modelb)
 names(post)
 
@@ -118,18 +125,24 @@ names(post)
 #  [5] "sd_REPLICLATE__Intercept"                     "sd_SITE__Intercept"                          
 #  [7] "sigma"         
 
-# we get what we need - for ranomd effect
-V_rep <-post$sd_REPLICLATE__Intercept^2 # making it varaince
+# we get what we need - for random effect
+V_rep <-post$sd_REPLICATE__Intercept^2 # making it variance
 V_site <-post$sd_SITE__Intercept^2
-V_res <- post$sigma^2
+V_res <- post$sigma^2 
+    # Why is sigma equal to residual variance? 
+    # Don't we need sigma to calculate error of estimates in plots?
+```
 
-# we need to caculate variance for fixed effects - this is not so easy
-# get a poistior for fixed effect bits (you need to get this as one - it will be difficult to decompose these 0 why?)
+
+```{r}
+# we need to calculate variance for fixed effects - this is not so easy
+# get a posterior for fixed effect bits (you need to get this as one - it will be difficult to decompose these - why?)
 # I cannot seem to get a model matrix from brms so I am going to use lmer
+
 # get a data frame of different posterior of fixed effects
 post_fix <- as.data.frame(t(post[,1:4]))
 
-# get a posteior of fixed effects
+# get a posterior of fixed effects
 V_fix <-  map_dbl(post_fix, ~ var(as.vector(. %*% t(model@pp$X))) )
 
 # mcmc object (from coda package)
@@ -138,20 +151,62 @@ post_mat <- as.mcmc(data.frame(V_rep, V_site, V_res, V_fix, row.names = NULL))
 summary(post_mat)
 plot(post_mat)
 
+head(post_mat)
+
 post_mat %>% data.frame %>% mutate(V_all = V_rep + V_site + V_res + V_fix,
                                    P_rep = V_rep/(V_rep + V_site + V_res + V_fix),
                                    P_site = V_site/(V_rep + V_site + V_res + V_fix),
                                    P_res = V_res/(V_rep + V_site + V_res + V_fix),
                                    P_fix = V_fix/(V_rep + V_site + V_res + V_fix),
-                                   P_all = P_rep + P_site + P_res + P_fix) %>% tibble ->  post_mat2
+                                   P_all = P_rep + P_site + P_res + P_fix)          ->  post_mat2
 
+```
+
+
+```{r}
 # Dax to make figure
+library(ggthemes)
+
+# Create table of variance values
+prop_post <- post_mat2 %>% 
+  mutate(
+    iteration = 1:length(post_mat2$P_all),
+    Variable = paste("plant.NPK")# make a col to represent each test
+  ) %>%
+  select(P_rep, P_site, P_res, P_fix, iteration, Variable) %>%
+  pivot_longer(c(-Variable, -iteration), values_to = "Variance") # flip the table
+
+str(prop_post)
+head(prop_post)
+ 
+# Summarised SE & mean values
+prop_post.sem <- prop_post %>% 
+  group_by(name) %>% 
+  summarise(mean = mean(Variance),
+            sem = sd(Variance) / sqrt(n()),
+            lower = (mean - sem),
+            upper = (mean + sem)) %>%
+  mutate(Variable = paste("plant.NPK"))
+str(prop_post.sem)
+
+prop_post$name <- as.factor(prop_post$name)
+prop_post.sem %>% 
+  ggplot(aes(x = Variable, y = mean, fill = name, colour = name)) + 
+  # stat_summary(fun.y = mean, geom = "bar", position = "stack") +
+  geom_bar(stat = "identity", position = "stack", width = 0.2, alpha = .6, size = 1) +
+  geom_errorbar(aes(ymin = lower, 
+                    ymax = upper),
+                stat = "identity",
+                width=.1,                    # Width of the error bars
+                position="identity", colour = "black") + 
+  coord_cartesian(ylim = c(0, 1.2)) + scale_fill_ptol() + scale_colour_ptol()
+?scale_fill_brewer
 
 
 # Dax - go to here (not all exp and code are useful)
 # https://github.com/paul-buerkner/brms
 # https://mjskay.github.io/tidybayes/articles/tidy-brms.html
-#https://www.rensvandeschoot.com/tutorials/brms-started/
+# https://www.rensvandeschoot.com/tutorials/brms-started/
 # and learn and do more exploration with this and other ones
 
 mean(V_rep) # this is posterior mean (variance of random effect estimate)
