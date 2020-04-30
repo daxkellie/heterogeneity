@@ -65,8 +65,6 @@ data_NutNet %>% head(5)
 ```
 
 
-## Repeatability Analysis
-
 Frequency Distribution
 ```{r}
 plot_frequencyDist <- function(df, variable) {
@@ -85,7 +83,7 @@ plot_frequencyDist(data_NutNet, "plant.P")
 plot_frequencyDist(data_NutNet, "plant.K")
 ```
 
-### Frequentist Model
+## Frequentist Model
 ```{r}
 # REPLICATE variable
 data_NutNet$REPLICATE <- paste0(data_NutNet$SITE, data_NutNet$TREATMENT)
@@ -98,6 +96,114 @@ hist(resid(model)) # Note that there is an outlier
 
 # Total Variance
 var(data_NutNet$plant.NPK)
+```
+
+## rptR Repeatability analysis
+
+Plant NPK
+```{r}
+# Plant NPK
+rep_plant.NPK <- rptGaussian(plant.NPK ~ TREATMENT + (1|SITE),
+                 grname = c("SITE", "Fixed", "Residual"), 
+                 data = data_NutNet,
+                 ratio = FALSE,
+                 nboot = 100, parallel = TRUE, adjusted = FALSE)
+
+rep_plant.NPK
+```
+
+Plant N
+```{r}
+# Plant N
+rep_plant.N <- rptGaussian(plant.N ~ TREATMENT + (1|SITE),
+                 grname = c("SITE", "Fixed", "Residual"), 
+                 data = data_NutNet,
+                 ratio = FALSE,
+                 nboot = 100, parallel = TRUE, adjusted = FALSE)
+
+rep_plant.N
+```
+
+Plant P
+```{r}
+# Plant P
+rep_plant.P <- rptGaussian(plant.P ~ TREATMENT + (1|SITE),
+                 grname = c("SITE", "Fixed", "Residual"), 
+                 data = data_NutNet,
+                 ratio = FALSE,
+                 nboot = 100, parallel = TRUE, adjusted = FALSE)
+
+rep_plant.P
+```
+
+Plant K
+```{r}
+# Plant K
+rep_plant.K <- rptGaussian(plant.K ~ TREATMENT + (1|SITE),
+                 grname = c("SITE", "Fixed", "Residual"), 
+                 data = data_NutNet,
+                 ratio = FALSE,
+                 nboot = 100, parallel = TRUE, adjusted = FALSE)
+
+rep_plant.K
+```
+
+
+### Data Viz - Variance Components
+
+Pull variance values from rptR output 
+```{r}
+# Function to pull variance values from rptR output
+
+create_VarTable <- function(repOutput, VariableName) {
+  
+  # retrieve variance values
+  varTable <- as.data.frame(repOutput$R)
+  
+  # make name usable for naming
+  VariableName <- as.character(VariableName)
+  
+  # Pivot table
+  varTable <- varTable %>% 
+  rename(., Location = SITE) %>% # rename SITE
+  mutate(
+    Variable = paste0(VariableName) # Add data identifier column
+  ) %>%
+  pivot_longer(-Variable, names_to = "Components", values_to = "Variance") # flip the table
+  
+  # add percent of total variance column
+  varTable$percentVar <- varTable$Variance/(sum(varTable$Variance))*100
+  
+  return(varTable)
+}
+```
+
+
+```{r}
+# Create tables with variance values
+varTable_plant.NPK <- create_VarTable(rep_plant.NPK, "plant.NPK")
+varTable_plant.N <- create_VarTable(rep_plant.N, "plant.N")
+varTable_plant.P <- create_VarTable(rep_plant.P, "plant.P")
+varTable_plant.K <- create_VarTable(rep_plant.K, "plant.K")
+
+# Create 
+varTable_NutNet <- rbind(varTable_plant.NPK, varTable_plant.N, 
+                         varTable_plant.P, varTable_plant.K)
+```
+
+*Plot*
+```{r}
+varTable_NutNet %>%
+  ggplot(aes(x = Data, y = percentVar, fill = Components)) + 
+  geom_bar(stat = "identity", position = "stack", width = .4) +
+  geom_text(aes(label = paste0(as.character(Components), "\n",  round(percentVar, 0), "%")), 
+            position = "stack", hjust = 1, size = 2, check_overlap = FALSE) + 
+    scale_fill_brewer(palette = "Pastel1", na.value = "grey70") + 
+    coord_flip() + 
+    theme_minimal(base_size = 12) + 
+    theme(axis.title = element_blank(), panel.grid.major.y = element_blank(), 
+          legend.position = "top")
+
 ```
 
 ### Bayesian Model
@@ -240,8 +346,8 @@ post_mat %>% data.frame %>% mutate(V_all = V_rep + V_site + V_res + V_fix,
 # Create table of variance values
 propPost_plant.NPK <- post_mat2_plant.NPK %>% 
   mutate(
-    iteration = 1:length(post_mat2_plant.NPK$P_all),
-    Variable = as.factor(paste("plant.NPK"))# make a col to represent each test
+    iteration = 1:length(post_mat2_plant.NPK$P_all), # make a col to represent each test
+    Variable = as.factor(paste("plant.NPK"))         # add Variable name
   ) %>%
   select(P_rep, P_site, P_res, P_fix, iteration, Variable) %>%
   pivot_longer(c(-Variable, -iteration), values_to = "Variance") # flip the table
@@ -286,7 +392,6 @@ propPost %>%
   coord_cartesian(ylim = c(0, 1.2)) + 
   ylab("Proportion of Total Variance") +
   scale_fill_ptol() + scale_colour_ptol()
-?scale_fill_brewer
 
 
 # Dax - go to here (not all exp and code are useful)
@@ -303,47 +408,7 @@ posterior.mode(V_rep) # posterior mode because variation is not normally distrib
 
 ```
 
-Repeatability
-```{r}
-rep2 <- rptGaussian(plant.NPK ~ TREATMENT + (1|SITE),
-                 grname = c("SITE", "Fixed", "Residual"), 
-                 data = data_NutNet,
-                 ratio = FALSE,
-                 nboot = 100, parallel = TRUE, adjusted = FALSE)
 
-rep2
-```
-
-
-## Plot Variance Components
-Data wrangling
-```{r}
-varTable_NutNet <- as.data.frame(rep2$R) # extract variance components in dataframe
-varTable_NutNet <- varTable_NutNet %>% 
-  rename(., Location = SITE) %>% # rename SITE
-  mutate(
-    Data = paste("NutNet") # Add data identifier column
-  ) %>%
-  pivot_longer(-Data, names_to = "Components", values_to = "Variance") # flip the table
-
-# add percent of total variance column
-varTable_NutNet$percentVar <- varTable_NutNet$Variance/(sum(varTable_NutNet$Variance))*100 
-```
-
-*Plot*
-```{r}
-varTable_NutNet %>%
-  ggplot(aes(x = Data, y = percentVar, fill = Components)) + 
-  geom_bar(stat = "identity", position = "stack", width = .4) +
-  geom_text(aes(label = paste0(as.character(Components), "\n",  round(percentVar, 0), "%")), 
-            position = "stack", hjust = 1, size = 2, check_overlap = FALSE) + 
-    scale_fill_brewer(palette = "Pastel1", na.value = "grey70") + 
-    coord_flip() + 
-    theme_minimal(base_size = 12) + 
-    theme(axis.title = element_blank(), panel.grid.major.y = element_blank(), 
-          legend.position = "top")
-
-```
 
 
 # Controlled Systematic Variability (CSV)
