@@ -80,6 +80,9 @@ plot_frequencyDist <- function(df, variable) {
   
 }
 plot_frequencyDist(data_NutNet, "plant.NPK")
+plot_frequencyDist(data_NutNet, "plant.N")
+plot_frequencyDist(data_NutNet, "plant.P")
+plot_frequencyDist(data_NutNet, "plant.K")
 ```
 
 ### Frequentist Model
@@ -98,25 +101,55 @@ var(data_NutNet$plant.NPK)
 ```
 
 ### Bayesian Model
-```{r}
-# Bayesian model
-modelb <-brm(plant.NPK ~ TREATMENT + (1|SITE) + (1|REPLICATE), data = data_NutNet,
-             chains = 2, cores = 2) # you can do more but 2 chains will be fine
+```{r, eval = FALSE}
+# Bayesian models
+# NPK
+# modelb_plant.NPK <- brm(plant.NPK ~ TREATMENT + (1|SITE) + (1|REPLICATE), 
+#                         data = data_NutNet,
+#                         chains = 2, cores = 2) # you can do more but 2 chains will be fine
+# N
+# modelb_plant.N <- brm(plant.N ~ TREATMENT + (1|SITE) + (1|REPLICATE), 
+#                         data = data_NutNet,
+#                         chains = 2, cores = 2)
+# P
+# modelb_plant.P <- brm(plant.P ~ TREATMENT + (1|SITE) + (1|REPLICATE), 
+#                         data = data_NutNet,
+#                         chains = 2, cores = 2)
+# K
+# modelb_plant.K <- brm(plant.K ~ TREATMENT + (1|SITE) + (1|REPLICATE), 
+#                         data = data_NutNet,
+#                         chains = 2, cores = 2)
 
-summary(modelb)
-
-# I have not used brms for a while - so testing a few functions
-bayes_R2(modelb)
-get_variables(modelb)
+# Save models
+# saveRDS(modelb_plant.NPK, "model_plantNPK.rds")
+# saveRDS(modelb_plant.N, "model_plantN.rds")
+# saveRDS(modelb_plant.P, "model_plantP.rds")
+# saveRDS(modelb_plant.K, "model_plantK.rds")
 ```
 
 
 ```{r}
+# Load models
+modelb_plant.NPK <- readRDS("model_plantNPK.rds")
+modelb_plant.N <- readRDS("model_plantN.rds")
+modelb_plant.P <- readRDS("model_plantP.rds")
+modelb_plant.K <- readRDS("model_plantK.rds")
+
+summary(modelb_plant.NPK)
+bayes_R2(modelb_plant.NPK)
+bayes_R2(modelb_plant.N)
+bayes_R2(modelb_plant.P)
+bayes_R2(modelb_plant.K)
+# get_variables(modelb)
+```
+
+##### Plant NPK
+```{r}
 # getting posterior of random effects for each
-# blups <- ranef(modelb, summary = F)
+# blups <- ranef(modelb, summary = F) # WHAT IS THIS DO I NEED IT
 
 # get all posterior samples
-post <- posterior_samples(modelb)
+post <- posterior_samples(modelb_plant.NPK)
 names(post)
 
 # these three are important
@@ -158,8 +191,81 @@ post_mat %>% data.frame %>% mutate(V_all = V_rep + V_site + V_res + V_fix,
                                    P_site = V_site/(V_rep + V_site + V_res + V_fix),
                                    P_res = V_res/(V_rep + V_site + V_res + V_fix),
                                    P_fix = V_fix/(V_rep + V_site + V_res + V_fix),
-                                   P_all = P_rep + P_site + P_res + P_fix)          ->  post_mat2
+                                   P_all = P_rep + P_site + P_res + P_fix)          ->  post_mat2_plant.NPK
 
+```
+
+##### Plant N
+
+```{r}
+# get all posterior samples
+post <- posterior_samples(modelb_plant.N)
+
+# we get what we need - for random effect
+V_rep <-post$sd_REPLICATE__Intercept^2 # making it variance
+V_site <-post$sd_SITE__Intercept^2
+V_res <- post$sigma^2 
+```
+
+
+```{r}
+# calculate variance for fixed effects
+
+# get a data frame of different posterior of fixed effects
+post_fix <- as.data.frame(t(post[,1:4]))
+
+# get a posterior of fixed effects
+V_fix <-  map_dbl(post_fix, ~ var(as.vector(. %*% t(model@pp$X))) )
+
+# mcmc object (from coda package)
+post_mat <- as.mcmc(data.frame(V_rep, V_site, V_res, V_fix, row.names = NULL))
+
+summary(post_mat)
+plot(post_mat)
+
+head(post_mat)
+
+post_mat %>% data.frame %>% mutate(V_all = V_rep + V_site + V_res + V_fix,
+                                   P_rep = V_rep/(V_rep + V_site + V_res + V_fix),
+                                   P_site = V_site/(V_rep + V_site + V_res + V_fix),
+                                   P_res = V_res/(V_rep + V_site + V_res + V_fix),
+                                   P_fix = V_fix/(V_rep + V_site + V_res + V_fix),
+                                   P_all = P_rep + P_site + P_res + P_fix)          ->  post_mat2_plant.N
+
+```
+
+
+### Visualization
+```{r}
+# Create table of variance values
+propPost_plant.NPK <- post_mat2_plant.NPK %>% 
+  mutate(
+    iteration = 1:length(post_mat2_plant.NPK$P_all),
+    Variable = as.factor(paste("plant.NPK"))# make a col to represent each test
+  ) %>%
+  select(P_rep, P_site, P_res, P_fix, iteration, Variable) %>%
+  pivot_longer(c(-Variable, -iteration), values_to = "Variance") # flip the table
+
+# plant N variance values
+propPost_plant.N <- post_mat2_plant.N %>% 
+  mutate(
+    iteration = 1:length(post_mat2_plant.N$P_all),
+    Variable = as.factor(paste("plant.N"))# make a col to represent each test
+  ) %>%
+  select(P_rep, P_site, P_res, P_fix, iteration, Variable) %>%
+  pivot_longer(c(-Variable, -iteration), values_to = "Variance") # flip the table
+
+propPost <- as.data.frame(rbind(propPost_plant.NPK, propPost_plant.N))
+
+ 
+# Summarised SE & mean values
+propPost.sem <- propPost %>% 
+  group_by(Variable, name) %>% 
+  summarise(mean = mean(Variance),
+            sem = sd(Variance) / sqrt(n()),
+            lower = (mean - sem),
+            upper = (mean + sem))
+str(propPost.sem)
 ```
 
 
@@ -167,39 +273,19 @@ post_mat %>% data.frame %>% mutate(V_all = V_rep + V_site + V_res + V_fix,
 # Dax to make figure
 library(ggthemes)
 
-# Create table of variance values
-prop_post <- post_mat2 %>% 
-  mutate(
-    iteration = 1:length(post_mat2$P_all),
-    Variable = paste("plant.NPK")# make a col to represent each test
-  ) %>%
-  select(P_rep, P_site, P_res, P_fix, iteration, Variable) %>%
-  pivot_longer(c(-Variable, -iteration), values_to = "Variance") # flip the table
-
-str(prop_post)
-head(prop_post)
- 
-# Summarised SE & mean values
-prop_post.sem <- prop_post %>% 
-  group_by(name) %>% 
-  summarise(mean = mean(Variance),
-            sem = sd(Variance) / sqrt(n()),
-            lower = (mean - sem),
-            upper = (mean + sem)) %>%
-  mutate(Variable = paste("plant.NPK"))
-str(prop_post.sem)
-
 prop_post$name <- as.factor(prop_post$name)
-prop_post.sem %>% 
-  ggplot(aes(x = Variable, y = mean, fill = name, colour = name)) + 
-  # stat_summary(fun.y = mean, geom = "bar", position = "stack") +
-  geom_bar(stat = "identity", position = "stack", width = 0.2, alpha = .6, size = 1) +
-  geom_errorbar(aes(ymin = lower, 
-                    ymax = upper),
-                stat = "identity",
-                width=.1,                    # Width of the error bars
-                position="identity", colour = "black") + 
-  coord_cartesian(ylim = c(0, 1.2)) + scale_fill_ptol() + scale_colour_ptol()
+propPost %>% 
+  ggplot(aes(x = Variable, y = Variance, fill = name, colour = name)) + 
+  stat_summary(fun.y = mean, geom = "bar", position = "stack",width = 0.2, alpha = .6, size = 1) +
+  # geom_bar(stat = "identity", position = "stack", width = 0.2, alpha = .6, size = 1) +
+  # geom_errorbar(aes(ymin = lower, 
+  #                   ymax = upper),
+  #               stat = "identity",
+  #               width=.1,                    # Width of the error bars
+  #               position="identity", colour = "black") + 
+  coord_cartesian(ylim = c(0, 1.2)) + 
+  ylab("Proportion of Total Variance") +
+  scale_fill_ptol() + scale_colour_ptol()
 ?scale_fill_brewer
 
 
