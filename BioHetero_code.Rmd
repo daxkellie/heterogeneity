@@ -215,7 +215,7 @@ varTable_NutNet %>%
 
 ```
 
-### Bayesian Model
+## Bayesian Model
 ```{r, eval = FALSE}
 # Bayesian models
 # NPK
@@ -545,8 +545,7 @@ rep_C.shoot <- rptGaussian(C.shoot ~ Legume*Method.comm + (1|Lab) + (1|CSV) + (1
 rep_C.shoot
 ```
 
-## Plot Variance Components
-Data wrangling
+## Data Viz - Variance Components
 
 Pull variance values from rptR output & Create table with variance components
 ```{r}
@@ -560,12 +559,34 @@ varTable_N.shoot <- create_VarTable(rep_N.shoot, "N.shoot", "Lab")
 varTable_C.shoot <- create_VarTable(rep_C.shoot, "C.shoot", "Lab")
 
 
-# Create 
+# Create table
 varTable_CSV <- rbind(varTable_biomass_Seed, varTable_biomass_Shoot, 
                       varTable_biomass_Root, varTable_biomass_Total,
                       varTable_ratio_RootShoot, varTable_N.shoot,
                       varTable_C.shoot)
 ```
+
+*Plot*
+```{r}
+library(forcats)
+
+varTable_CSV %>%
+  mutate(Components = fct_relevel(Components,
+                                  "Fixed", "Replicate", "CSV", "Residual", "Location")) %>%
+  
+  ggplot(aes(x = Variable, y = percentVar, fill = Components)) + 
+  geom_bar(stat = "identity", position = "stack", width = .4) +
+  geom_text(aes(label = paste0(round(percentVar, 0), "%")), 
+            position = "stack", hjust = 1, size = 2, check_overlap = FALSE) + 
+    scale_fill_ptol() + 
+    coord_flip() + 
+  ylab("Proportion of Variance (%)") + 
+    theme_minimal(base_size = 12) 
+    theme(axis.title = element_blank(), panel.grid.major.y = element_blank(), 
+          legend.position = "top")
+
+```
+
 
 
 # Biodiversity x Drought
