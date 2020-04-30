@@ -91,7 +91,10 @@ data_NutNet$REPLICATE <- paste0(data_NutNet$SITE, data_NutNet$TREATMENT)
 # Frequentist model
 model <- lmer(plant.NPK ~ TREATMENT + (1|SITE) + (1|REPLICATE), data = data_NutNet)
 summary(model)
+hist(resid(model)) # Note that there is an outlier
 
+model <- lmer(plant.N ~ TREATMENT + (1|SITE) + (1|REPLICATE), data = data_NutNet)
+summary(model)
 hist(resid(model)) # Note that there is an outlier
 
 # Total Variance
@@ -155,19 +158,19 @@ Pull variance values from rptR output
 ```{r}
 # Function to pull variance values from rptR output
 
-create_VarTable <- function(repOutput, VariableName) {
+create_VarTable <- function(repOutput, VariableName, BioHetVariable) {
   
   # retrieve variance values
   varTable <- as.data.frame(repOutput$R)
   
-  # make name usable for naming
+  # make name usable
   VariableName <- as.character(VariableName)
   
   # Pivot table
   varTable <- varTable %>% 
-  rename(., Location = SITE) %>% # rename SITE
+  rename(., Location = paste0(BioHetVariable)) %>% # rename SITE
   mutate(
-    Variable = paste0(VariableName) # Add data identifier column
+    Variable = as.factor(paste0(VariableName)) # Add data identifier column
   ) %>%
   pivot_longer(-Variable, names_to = "Components", values_to = "Variance") # flip the table
   
@@ -178,23 +181,17 @@ create_VarTable <- function(repOutput, VariableName) {
 }
 ```
 
-
+Create tables with variance values
 ```{r}
-# Create tables with variance values
-varTable_plant.NPK <- create_VarTable(rep_plant.NPK, "plant.NPK")
-varTable_plant.N <- create_VarTable(rep_plant.N, "plant.N")
-varTable_plant.P <- create_VarTable(rep_plant.P, "plant.P")
-varTable_plant.K <- create_VarTable(rep_plant.K, "plant.K")
+
+varTable_plant.NPK <- create_VarTable(rep_plant.NPK, "plant.NPK", "SITE")
+varTable_plant.N <- create_VarTable(rep_plant.N, "plant.N", "SITE")
+varTable_plant.P <- create_VarTable(rep_plant.P, "plant.P", "SITE")
+varTable_plant.K <- create_VarTable(rep_plant.K, "plant.K", "SITE")
 
 # Create 
 varTable_NutNet <- rbind(varTable_plant.NPK, varTable_plant.N, 
                          varTable_plant.P, varTable_plant.K)
-str(varTable_NutNet)
-# Rename variables for plotting
-varTable_NutNet %>%
-  mutate(
-    
-  )
 ```
 
 *Plot*
@@ -212,7 +209,7 @@ varTable_NutNet %>%
     scale_fill_ptol() + 
     coord_flip() + 
   ylab("Proportion of Variance (%)") + 
-    theme_minimal(base_size = 12) + 
+    theme_minimal(base_size = 12) 
     theme(axis.title = element_blank(), panel.grid.major.y = element_blank(), 
           legend.position = "top")
 
@@ -459,7 +456,7 @@ data_CSV %>% head(10)
 
 Shinichi's model
 ```{r}
-data_CSV$Replicate <-  paste0(data_CSV$Block, data_CSV$Lab) # add block x lab variable
+data_CSV$Replicate <-  paste0(data_CSV$Block, data_CSV$Lab) # add replicate variable
 
 model <- lmer(biomass_Seed ~ Legume*Method.comm + (1|Lab) + (1|CSV)+
                 (1| Replicate), 
@@ -470,31 +467,104 @@ summary(model)
 Frequency distribution of data
 ```{r}
 plot_frequencyDist(data_CSV, "biomass_Seed")
+plot_frequencyDist(data_CSV, "biomass_Seed")
 ```
 
-```{r}
-rep3 <- rptGaussian(biomass_Seed ~ Legume*Method.comm + (1|Lab) + (1|CSV) + (1| Replicate),
-                   grname = c("Lab", "CSV", "Replicate", "Fixed", "Residual"), 
-                   data = data_CSV,
-                   ratio = FALSE,
-                   nboot = 10, parallel = FALSE, adjusted = FALSE)
+## rptR Repeatability Analysis
+_Use the buttons to navigate_
 
-rep3
+### Seed Biomass
+```{r}
+rep_biomass_Seed <- rptGaussian(biomass_Seed ~ Legume*Method.comm + (1|Lab) + (1|CSV) + (1| Replicate),
+                    grname = c("Lab", "CSV", "Replicate", "Fixed", "Residual"), 
+                    data = data_CSV,
+                    ratio = FALSE,
+                    nboot = 100, parallel = TRUE, adjusted = FALSE)
+
+rep_biomass_Seed
+```
+
+### Shoot Biomass
+```{r}
+rep_biomass_Shoot <- rptGaussian(biomass_Shoot ~ Legume*Method.comm + (1|Lab) + (1|CSV) + (1| Replicate),
+                    grname = c("Lab", "CSV", "Replicate", "Fixed", "Residual"), 
+                    data = data_CSV,
+                    ratio = FALSE,
+                    nboot = 10, parallel = FALSE, adjusted = FALSE)
+rep_biomass_Shoot
+```
+
+### Root Biomass
+```{r}
+rep_biomass_Root <- rptGaussian(biomass_Root ~ Legume*Method.comm + (1|Lab) + (1|CSV) + (1| Replicate),
+                    grname = c("Lab", "CSV", "Replicate", "Fixed", "Residual"), 
+                    data = data_CSV,
+                    ratio = FALSE,
+                    nboot = 100, parallel = TRUE, adjusted = FALSE)
+rep_biomass_Root
+```
+
+### Total Biomass
+```{r}
+rep_biomass_Total <- rptGaussian(biomass_Total ~ Legume*Method.comm + (1|Lab) + (1|CSV) + (1| Replicate),
+                    grname = c("Lab", "CSV", "Replicate", "Fixed", "Residual"), 
+                    data = data_CSV,
+                    ratio = FALSE,
+                    nboot = 100, parallel = TRUE, adjusted = FALSE)
+rep_biomass_Total
+```
+
+### Root:Shoot Ratio
+```{r}
+rep_ratio_RootShoot <- rptGaussian(ratio_RootShoot ~ Legume*Method.comm + 
+                                     (1|Lab) + (1|CSV) + (1| Replicate),
+                    grname = c("Lab", "CSV", "Replicate", "Fixed", "Residual"), 
+                    data = data_CSV,
+                    ratio = FALSE,
+                    nboot = 100, parallel = TRUE, adjusted = FALSE)
+rep_ratio_RootShoot
+```
+
+### N Shoot
+```{r}
+rep_N.shoot <- rptGaussian(N.shoot ~ Legume*Method.comm + (1|Lab) + (1|CSV) + (1| Replicate),
+                    grname = c("Lab", "CSV", "Replicate", "Fixed", "Residual"), 
+                    data = data_CSV,
+                    ratio = FALSE,
+                    nboot = 100, parallel = TRUE, adjusted = FALSE)
+rep_N.shoot
+```
+
+### C Shoot
+```{r}
+rep_C.shoot <- rptGaussian(C.shoot ~ Legume*Method.comm + (1|Lab) + (1|CSV) + (1| Replicate),
+                    grname = c("Lab", "CSV", "Replicate", "Fixed", "Residual"), 
+                    data = data_CSV,
+                    ratio = FALSE,
+                    nboot = 100, parallel = TRUE, adjusted = FALSE)
+rep_C.shoot
 ```
 
 ## Plot Variance Components
 Data wrangling
-```{r}
-varTable_CSV <- as.data.frame(rep3$R) # extract variance components in dataframe
-varTable_CSV <- varTable_CSV %>% 
-  rename(., Location = Lab) %>% # rename SITE
-  mutate(
-    Data = paste("CSV") # Add data identifier column
-  ) %>%
-  pivot_longer(-Data, names_to = "Components", values_to = "Variance") # flip the table
 
-# add percent of total variance column
-varTable_CSV$percentVar <- varTable_CSV$Variance/(sum(varTable_CSV$Variance))*100 
+Pull variance values from rptR output & Create table with variance components
+```{r}
+
+varTable_biomass_Seed <- create_VarTable(rep_biomass_Seed, "biomass_Seed", "Lab")
+varTable_biomass_Shoot <- create_VarTable(rep_biomass_Shoot, "biomass_Shoot", "Lab")
+varTable_biomass_Root <- create_VarTable(rep_biomass_Root, "biomass_Root", "Lab")
+varTable_biomass_Total <- create_VarTable(rep_biomass_Total, "biomass_Total", "Lab")
+varTable_ratio_RootShoot <- create_VarTable(rep_ratio_RootShoot, "ratio_RootShoot", "Lab")
+varTable_N.shoot <- create_VarTable(rep_N.shoot, "N.shoot", "Lab")
+varTable_C.shoot <- create_VarTable(rep_C.shoot, "C.shoot", "Lab")
+
+
+# Create 
+varTable_CSV <- rbind(varTable_biomass_Seed, varTable_biomass_Shoot, 
+                      varTable_biomass_Root, varTable_biomass_Total,
+                      varTable_ratio_RootShoot, varTable_N.shoot,
+                      varTable_C.shoot)
 ```
 
 
