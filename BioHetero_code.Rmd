@@ -189,17 +189,29 @@ varTable_plant.K <- create_VarTable(rep_plant.K, "plant.K")
 # Create 
 varTable_NutNet <- rbind(varTable_plant.NPK, varTable_plant.N, 
                          varTable_plant.P, varTable_plant.K)
+str(varTable_NutNet)
+# Rename variables for plotting
+varTable_NutNet %>%
+  mutate(
+    
+  )
 ```
 
 *Plot*
 ```{r}
+library(forcats)
+
 varTable_NutNet %>%
-  ggplot(aes(x = Data, y = percentVar, fill = Components)) + 
+  mutate(Components = fct_relevel(Components, 
+                                  "Fixed", "Residual", "Location")) %>%
+  
+  ggplot(aes(x = Variable, y = percentVar, fill = Components)) + 
   geom_bar(stat = "identity", position = "stack", width = .4) +
-  geom_text(aes(label = paste0(as.character(Components), "\n",  round(percentVar, 0), "%")), 
+  geom_text(aes(label = paste0(round(percentVar, 0), "%")), 
             position = "stack", hjust = 1, size = 2, check_overlap = FALSE) + 
-    scale_fill_brewer(palette = "Pastel1", na.value = "grey70") + 
+    scale_fill_ptol() + 
     coord_flip() + 
+  ylab("Proportion of Variance (%)") + 
     theme_minimal(base_size = 12) + 
     theme(axis.title = element_blank(), panel.grid.major.y = element_blank(), 
           legend.position = "top")
