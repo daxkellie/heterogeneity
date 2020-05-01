@@ -41,8 +41,8 @@ rstan_options(auto_write = TRUE)
 data_CSV <- read.csv("Datasets/CSV_microcosms/data/milcu_etal2017.csv", header = TRUE)
 data_NutNet <- read.csv("Datasets/NutNet/data/Model2.SEM.plot.data.csv", header = TRUE)
 data_biomass <- read.csv("Datasets/RichnessDrought/data/biomass_1.2.csv", header = TRUE)
+data_BLM <- read.csv("Datasets/BLM/terradat_points_table.csv")
 # more to add here
-
 
 ```
 
@@ -152,7 +152,7 @@ rep_plant.K
 ```
 
 
-### Data Viz - Variance Components
+### Viz - Variance Components
 
 Pull variance values from rptR output 
 ```{r}
@@ -197,6 +197,7 @@ varTable_NutNet <- rbind(varTable_plant.NPK, varTable_plant.N,
 *Plot*
 ```{r}
 library(forcats)
+library(ggthemes)
 
 varTable_NutNet %>%
   mutate(Components = fct_relevel(Components, 
@@ -209,7 +210,7 @@ varTable_NutNet %>%
     scale_fill_ptol() + 
     coord_flip() + 
   ylab("Proportion of Variance (%)") + 
-    theme_minimal(base_size = 12) 
+    theme_minimal(base_size = 12)
     theme(axis.title = element_blank(), panel.grid.major.y = element_blank(), 
           legend.position = "top")
 
@@ -257,6 +258,36 @@ bayes_R2(modelb_plant.P)
 bayes_R2(modelb_plant.K)
 # get_variables(modelb)
 ```
+
+
+```{r}
+ggplot(data  = data_NutNet,
+       aes(x = TREATMENT,
+           y = plant.NPK,
+           colour = TREATMENT))+
+  geom_point(size = 1.2,
+             alpha = .8,
+             position = "jitter")+# to add some random noise for plotting purposes
+  theme_minimal() + theme(legend.position = "none")
+```
+
+```{r}
+library(ggmcmc)
+
+model1transformed <- ggs(modelb_plant.NPK)
+ggplot(filter(model1transformed, Parameter %in% c("b_Intercept", "b_extrav", "b_sex")),
+       aes(x   = Iteration,
+           y   = value, 
+           col = as.factor(Chain)))+
+  geom_line() +
+  geom_vline(xintercept = 1000)+
+  facet_grid(Parameter ~ . ,
+             scale  = 'free_y',
+             switch = 'y')+
+  labs(title = "Caterpillar Plots", 
+       col   = "Chains")
+```
+
 
 ##### Plant NPK
 ```{r}
@@ -350,29 +381,33 @@ post_mat %>% data.frame %>% mutate(V_all = V_rep + V_site + V_res + V_fix,
 ```
 
 
-### Visualization
+### Viz - Variance Components
 ```{r}
-# Create table of variance values
-propPost_plant.NPK <- post_mat2_plant.NPK %>% 
+# Function to create data frames
+create_bayesVarTable <- function(posteriorVarianceDF, variableName) {
+  # make variable name usable for character
+  varName <- as.character(variableName)
+  
+  # build data frame
+  dataFrame <- posteriorVarianceDF %>% 
   mutate(
     iteration = 1:length(post_mat2_plant.NPK$P_all), # make a col to represent each test
-    Variable = as.factor(paste("plant.NPK"))         # add Variable name
+    Variable = as.factor(paste(variableName))         # add Variable name
   ) %>%
   select(P_rep, P_site, P_res, P_fix, iteration, Variable) %>%
   pivot_longer(c(-Variable, -iteration), values_to = "Variance") # flip the table
+}
 
-# plant N variance values
-propPost_plant.N <- post_mat2_plant.N %>% 
-  mutate(
-    iteration = 1:length(post_mat2_plant.N$P_all),
-    Variable = as.factor(paste("plant.N"))# make a col to represent each test
-  ) %>%
-  select(P_rep, P_site, P_res, P_fix, iteration, Variable) %>%
-  pivot_longer(c(-Variable, -iteration), values_to = "Variance") # flip the table
+propPost_plant.NPK <- create_bayesVarTable(post_mat2_plant.NPK, "plant.NPK")
+propPost_plant.N <- create_bayesVarTable(post_mat2_plant.N, "plant.N")
 
+
+# Combine
 propPost <- as.data.frame(rbind(propPost_plant.NPK, propPost_plant.N))
-
  
+str(propPost)
+
+
 # Summarised SE & mean values
 propPost.sem <- propPost %>% 
   group_by(Variable, name) %>% 
@@ -388,19 +423,32 @@ str(propPost.sem)
 # Dax to make figure
 library(ggthemes)
 
-prop_post$name <- as.factor(prop_post$name)
-propPost %>% 
-  ggplot(aes(x = Variable, y = Variance, fill = name, colour = name)) + 
-  stat_summary(fun.y = mean, geom = "bar", position = "stack",width = 0.2, alpha = .6, size = 1) +
+propPost %>%
+    mutate(
+    name = as.factor(recode(name,
+                        "P_fix" = "Fixed",
+                        "P_rep" = "Replicate",
+                        "P_res" = "Residual",
+                        "P_site" = "Location"))
+  ) %>%
+  ggplot(aes(x = name, y = Variance, fill = name, colour = name)) + 
+  facet_grid(~Variable) +
+  stat_summary(fun.y = mean, geom = "bar", position = "dodge",width = 1, alpha = .8) +
+  stat_summary(fun.data = mean_cl_normal, geom = "errorbar", 
+               width = 0.15, position = position_dodge(width = 0.90), colour = "black") +
   # geom_bar(stat = "identity", position = "stack", width = 0.2, alpha = .6, size = 1) +
   # geom_errorbar(aes(ymin = lower, 
   #                   ymax = upper),
   #               stat = "identity",
   #               width=.1,                    # Width of the error bars
   #               position="identity", colour = "black") + 
-  coord_cartesian(ylim = c(0, 1.2)) + 
-  ylab("Proportion of Total Variance") +
-  scale_fill_ptol() + scale_colour_ptol()
+  coord_cartesian(ylim = c(0, 1)) + 
+  scale_y_continuous(labels = scales::percent) +
+  labs(x = "Variance Components",
+       y = "Proportion of Total Variance") +
+  scale_fill_ptol() + scale_colour_ptol() + 
+  theme_minimal() + 
+  theme(legend.position = "none")
 
 
 # Dax - go to here (not all exp and code are useful)
@@ -587,30 +635,23 @@ varTable_CSV %>%
 
 ```
 
+# BLM Data
+Bureau of Land Management data
+
+```{r}
+data_biomass %>% glimpse()
+data_biomass %>% head(5)
+```
+
+
+
+
 
 
 # Biodiversity x Drought
 ```{r}
 data_biomass %>% glimpse()
 data_biomass %>% head(5)
-```
-
-# PLOT
-```{r}
-varTable <- rbind(varTable_NutNet, varTable_CSV)
-```
-```{r}
-varTable %>%
-  ggplot(aes(x = Data, y = percentVar, fill = Components)) + 
-  geom_bar(stat = "identity", position = "stack", width = .4) +
-  geom_text(aes(label = paste0(as.character(Components), "\n",  round(percentVar, 0), "%")), 
-            position = "stack", hjust = 1, size = 2, check_overlap = FALSE) + 
-    scale_fill_brewer(palette = "Pastel1", na.value = "grey70") + 
-    coord_flip() + 
-    theme_minimal(base_size = 12) + 
-    theme(axis.title = element_blank(), panel.grid.major.y = element_blank(), 
-          legend.position = "top")
-
 ```
 
 
