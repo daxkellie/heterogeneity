@@ -256,7 +256,6 @@ bayes_R2(modelb_plant.NPK)
 bayes_R2(modelb_plant.N)
 bayes_R2(modelb_plant.P)
 bayes_R2(modelb_plant.K)
-# get_variables(modelb)
 ```
 
 
@@ -270,12 +269,15 @@ ggplot(data  = data_NutNet,
              position = "jitter")+# to add some random noise for plotting purposes
   theme_minimal() + theme(legend.position = "none")
 ```
+```{r}
+get_variables(modelb_plant.NPK)
+```
 
 ```{r}
 library(ggmcmc)
 
 model1transformed <- ggs(modelb_plant.NPK)
-ggplot(filter(model1transformed, Parameter %in% c("b_Intercept", "b_extrav", "b_sex")),
+ggplot(filter(model1transformed, Parameter %in% c("b_Intercept", "sigma", "r_SITE[burrawan.au,Intercept]")),
        aes(x   = Iteration,
            y   = value, 
            col = as.factor(Chain)))+
@@ -286,6 +288,22 @@ ggplot(filter(model1transformed, Parameter %in% c("b_Intercept", "b_extrav", "b_
              switch = 'y')+
   labs(title = "Caterpillar Plots", 
        col   = "Chains")
+```
+
+```{r}
+modelb_plant.NPK %>%
+  spread_draws(b_Intercept, r_SITE[location,]) %>%
+  median_qi(location_mean = b_Intercept + r_SITE) %>%
+  ggplot(aes(y = location, x = location_mean, xmin = .lower, xmax = .upper)) +
+  geom_pointintervalh()
+```
+
+```{r}
+data_NutNet %>%
+  data_grid(SITE) %>%
+  add_predicted_draws(modelb_plant.NPK) %>%
+  ggplot(aes(x = .prediction, y = R_SITE)) +
+  stat_slabh()
 ```
 
 
