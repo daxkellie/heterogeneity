@@ -41,8 +41,9 @@ rstan_options(auto_write = TRUE)
 data_CSV <- read.csv("Datasets/CSV_microcosms/data/milcu_etal2017.csv", header = TRUE)
 data_NutNet <- read.csv("Datasets/NutNet/data/Model2.SEM.plot.data.csv", header = TRUE)
 data_biomass <- read.csv("Datasets/RichnessDrought/data/biomass_1.2.csv", header = TRUE)
-data_BLM <- read.csv("Datasets/BLM/terradat_points_table.csv")
+data_BLM <- read.csv("Datasets/BLM/terradat_points_table.csv") # I do not think this is what we want
 # more to add here
+
 
 ```
 
@@ -657,13 +658,47 @@ varTable_CSV %>%
 Bureau of Land Management data
 
 ```{r}
-data_biomass %>% glimpse()
-data_biomass %>% head(5)
+data_BLM %>% glimpse()
+data_BLM %>% head(5)
+dim(data_BLM)
 ```
 
+# Example Model for 
 
+Dax says:
 
+__ProjectName__: Refers to the broader project area the data was collected in. Generally includes the state, BLM management office and year.
+(what Tim says we can treat as our "site/location" variable)
+__PlotID__: Name for each location or "plot" where data is collected, as assigned by the data collector. Duplicate Plot ID's may exist among different Sites and Projects, but not within the same Site.
+(So each PlotID is unique)
+__PlotKey__: Unique numeric ID associated with each plot location. This is automatically generated in DIMA the first time the plot is created. Future visits to the same plot might use the same PlotKey. Users are encouraged to use spatial joins to track trend over time.
+(So sometimes, but not always, there may be multiple years of data for a plot location, which is tracked using this variable)
 
+<!-- Note: OK - this is good but I now see we need to recode PlotID to use this (so we cannot use PlotID as they as when we fit in the mixed model (very much like we did for other datasets. -->
+
+```{r}
+# transforming some of the data
+# one problem I see is that soil stablity seems like a maesurement 0 - 6 (how this is determined - some sort of artificial scale???)
+hist(data_BLM$SoilStability_All)
+hist(data_BLM$SoilStability_Protected)
+hist(data_BLM$NonInvPerenGrassCover_AH)
+
+# just creating a smaller data set for me for a test
+dim(data_BLM)
+sum(complete.cases(data_BLM)) # OK this loses a lot of data
+
+# we should get the total variance of 1
+data_BLM %>% mutate(z_soil_stab = scale(SoilStability_All), z_non_inv_cover = scale(NonInvPerenGrassCover_AH)) %>% select(ProjectName, z_soil_stab, z_non_inv_cover) -> sdata_BLM
+
+sdata_BLM <- sdata_BLM[complete.cases(sdata_BLM), ]
+#sdata_BLM
+
+# Frequentist model
+model <- lmer(z_soil_stab ~ z_non_inv_cover + (1 + z_non_inv_cover|ProjectName) , data = sdata_BLM)
+summary(model)
+hist(resid(model)) # Looks great
+
+```
 
 
 # Biodiversity x Drought
