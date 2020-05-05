@@ -693,10 +693,15 @@ data_BLM %>% mutate(z_soil_stab = scale(SoilStability_All), z_non_inv_cover = sc
 sdata_BLM <- sdata_BLM[complete.cases(sdata_BLM), ]
 #sdata_BLM
 
-# Frequentist model
+# random slope model
 model <- lmer(z_soil_stab ~ z_non_inv_cover + (1 + z_non_inv_cover|ProjectName) , data = sdata_BLM)
 summary(model)
 hist(resid(model)) # Looks great
+
+# random intercept model
+model0 <- lmer(z_soil_stab ~ z_non_inv_cover + (1 |ProjectName) , data = sdata_BLM)
+summary(model0)
+hist(resid(model0)) 
 
 ```
 
