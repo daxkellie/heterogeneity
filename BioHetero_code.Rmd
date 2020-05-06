@@ -300,11 +300,13 @@ modelb_plant.NPK %>%
 ```
 
 ```{r}
-data_NutNet %>%
-  data_grid(SITE) %>%
-  add_predicted_draws(modelb_plant.NPK) %>%
-  ggplot(aes(x = .prediction, y = R_SITE)) +
-  stat_slabh()
+library(modelr)
+
+# data_NutNet %>%
+#   data_grid(SITE) %>%
+#   add_predicted_draws(modelb_plant.NPK) %>%
+#   ggplot(aes(x = .prediction, y = R_SITE)) +
+#   stat_slabh()
 ```
 
 
@@ -662,6 +664,24 @@ data_BLM %>% glimpse()
 data_BLM %>% head(5)
 dim(data_BLM)
 ```
+
+```{r}
+library(sf)
+library("rnaturalearth")
+library("rnaturalearthdata")
+
+world <- ne_countries(scale = "medium", returnclass = "sf")
+library(tidyverse)
+ggplot(data = world) +
+    geom_sf() +
+    geom_point(data = data_BLM, aes(x = Longitude, y = Latitude), size = 1, 
+               shape = 21, fill = "red") +
+    coord_sf(xlim = c(-180, 120), ylim = c(-80, 80), expand = FALSE) + 
+  theme_bw()
+
+```
+
+
 
 # Example Model for 
 
