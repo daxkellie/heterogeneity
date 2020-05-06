@@ -102,6 +102,11 @@ model <- lmer(plant.K ~ TREATMENT + (1|SITE) + (1|REPLICATE), data = data_NutNet
 summary(model)
 hist(resid(model)) # Note that there is an outlier
 
+# total biomass
+model <- lmer(TOTAL.AG.BIOMASS ~ TREATMENT + (1|SITE) + (1|REPLICATE), data = data_NutNet)
+summary(model)
+hist(resid(model)) # Note that there is an outlier
+
 # Total Variance
 var(data_NutNet$plant.NPK)
 ```
@@ -161,6 +166,18 @@ rep_plant.K <- rptGaussian(plant.K ~ TREATMENT + (1|SITE),
 rep_plant.K
 ```
 
+# Total AG Biomass
+```{r}
+# Total AG Biomass
+rep_total.ag.biomass <- rptGaussian(TOTAL.AG.BIOMASS ~ TREATMENT + (1|SITE),
+                 grname = c("SITE", "Fixed", "Residual"), 
+                 data = data_NutNet,
+                 ratio = FALSE,
+                 nboot = 100, parallel = TRUE, adjusted = FALSE)
+
+rep_total.ag.biomass
+```
+
 
 ### Viz - Variance Components
 
@@ -198,10 +215,12 @@ varTable_plant.NPK <- create_VarTable(rep_plant.NPK, "plant.NPK", "SITE")
 varTable_plant.N <- create_VarTable(rep_plant.N, "plant.N", "SITE")
 varTable_plant.P <- create_VarTable(rep_plant.P, "plant.P", "SITE")
 varTable_plant.K <- create_VarTable(rep_plant.K, "plant.K", "SITE")
+varTable_total.ag.biomass <- create_VarTable(rep_total.ag.biomass, "total.ag.biomass", "SITE")
 
 # Create 
 varTable_NutNet <- rbind(varTable_plant.N, 
-                         varTable_plant.P, varTable_plant.K)
+                         varTable_plant.P, varTable_plant.K,
+                         varTable_total.ag.biomass)
 ```
 
 *Plot*
@@ -245,12 +264,17 @@ varTable_NutNet %>%
 # modelb_plant.K <- brm(plant.K ~ TREATMENT + (1|SITE) + (1|REPLICATE), 
 #                         data = data_NutNet,
 #                         chains = 2, cores = 2)
+# K
+modelb_total.ag.biomass <- brm(TOTAL.AG.BIOMASS ~ TREATMENT + (1|SITE) + (1|REPLICATE),
+                        data = data_NutNet,
+                        chains = 2, cores = 2)
 
 # Save models
 # saveRDS(modelb_plant.NPK, "model_plantNPK.rds")
 # saveRDS(modelb_plant.N, "model_plantN.rds")
 # saveRDS(modelb_plant.P, "model_plantP.rds")
 # saveRDS(modelb_plant.K, "model_plantK.rds")
+# saveRDS(modelb_total.ag.biomass, "model_total.ag.biomass.rds")
 ```
 
 
@@ -410,7 +434,7 @@ post_mat %>% data.frame %>% mutate(V_all = V_rep + V_site + V_res + V_fix,
 
 ```
 
-### Plant P
+#### Plant P
 ```{r}
 # get all posterior samples
 post <- posterior_samples(modelb_plant.P)
@@ -449,7 +473,44 @@ post_mat %>% data.frame %>% mutate(V_all = V_rep + V_site + V_res + V_fix,
 ```
 
 
-### Plant K
+#### Plant K
+```{r}
+# get all posterior samples
+post <- posterior_samples(modelb_plant.K)
+
+# we get what we need - for random effect
+V_rep <-post$sd_REPLICATE__Intercept^2 # making it variance
+V_site <-post$sd_SITE__Intercept^2
+V_res <- post$sigma^2 
+```
+
+
+```{r}
+# calculate variance for fixed effects
+
+# get a data frame of different posterior of fixed effects
+post_fix <- as.data.frame(t(post[,1:4]))
+
+# get a posterior of fixed effects
+V_fix <-  map_dbl(post_fix, ~ var(as.vector(. %*% t(model@pp$X))) )
+
+# mcmc object (from coda package)
+post_mat <- as.mcmc(data.frame(V_rep, V_site, V_res, V_fix, row.names = NULL))
+
+summary(post_mat)
+plot(post_mat)
+
+head(post_mat)
+
+post_mat %>% data.frame %>% mutate(V_all = V_rep + V_site + V_res + V_fix,
+                                   P_rep = V_rep/(V_rep + V_site + V_res + V_fix),
+                                   P_site = V_site/(V_rep + V_site + V_res + V_fix),
+                                   P_res = V_res/(V_rep + V_site + V_res + V_fix),
+                                   P_fix = V_fix/(V_rep + V_site + V_res + V_fix),
+                                   P_all = P_rep + P_site + P_res + P_fix)          ->  post_mat2_plant.K
+
+```
+
 ```{r}
 # get all posterior samples
 post <- posterior_samples(modelb_plant.K)
