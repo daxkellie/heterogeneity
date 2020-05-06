@@ -17,16 +17,8 @@ rm(list=ls())
 ```
 
 ```{r packages, message = FALSE, warning = FALSE, error = FALSE}
-
-# packages
-# library(tidyverse)
-# library(lme4)
-# library(lmerTest)
-# library(MuMIn)
-# library(rptR)
-# library(brms)
-
-pacman::p_load(tidyverse, lme4, lmerTest, MuMIn, rstan, brms, rptR, tidybayes, coda)
+pacman::p_load(tidyverse, lme4, lmerTest, MuMIn, rstan, brms, rptR, tidybayes, coda,
+               sf, "rnaturalearth", "rnaturalearthdata", modelr, ggthemes, ggmcmc, MCMCglmm)
 
 # helping running rstan (brms) models
 
@@ -94,13 +86,30 @@ model <- lmer(plant.NPK ~ TREATMENT + (1|SITE) + (1|REPLICATE), data = data_NutN
 summary(model)
 hist(resid(model)) # Note that there is an outlier
 
-model <- lmer(plant.N ~ TREATMENT + (1|SITE) + (1|REPLICATE), data = data_NutNet)
+# plant N
+data_NutNet$log_plant.N <- log(data_NutNet$plant.N) # note - log doesn't fix skew
+model <- lmer(log_plant.N ~ TREATMENT + (1|SITE) + (1|REPLICATE), data = data_NutNet)
+summary(model)
+hist(resid(model)) # Note that there is an outlier
+
+# plant P
+model <- lmer(plant.P ~ TREATMENT + (1|SITE) + (1|REPLICATE), data = data_NutNet)
+summary(model)
+hist(resid(model)) # Note that there is an outlier
+
+# plant K
+model <- lmer(plant.K ~ TREATMENT + (1|SITE) + (1|REPLICATE), data = data_NutNet)
 summary(model)
 hist(resid(model)) # Note that there is an outlier
 
 # Total Variance
 var(data_NutNet$plant.NPK)
 ```
+
+**Note:** plant.N & plant.P both have an outlier skewing residuals. plant.K appears normally distributed.
+
+
+
 
 ## rptR Repeatability analysis
 
@@ -191,7 +200,7 @@ varTable_plant.P <- create_VarTable(rep_plant.P, "plant.P", "SITE")
 varTable_plant.K <- create_VarTable(rep_plant.K, "plant.K", "SITE")
 
 # Create 
-varTable_NutNet <- rbind(varTable_plant.NPK, varTable_plant.N, 
+varTable_NutNet <- rbind(varTable_plant.N, 
                          varTable_plant.P, varTable_plant.K)
 ```
 
@@ -401,6 +410,83 @@ post_mat %>% data.frame %>% mutate(V_all = V_rep + V_site + V_res + V_fix,
 
 ```
 
+### Plant P
+```{r}
+# get all posterior samples
+post <- posterior_samples(modelb_plant.P)
+
+# we get what we need - for random effect
+V_rep <-post$sd_REPLICATE__Intercept^2 # making it variance
+V_site <-post$sd_SITE__Intercept^2
+V_res <- post$sigma^2 
+```
+
+
+```{r}
+# calculate variance for fixed effects
+
+# get a data frame of different posterior of fixed effects
+post_fix <- as.data.frame(t(post[,1:4]))
+
+# get a posterior of fixed effects
+V_fix <-  map_dbl(post_fix, ~ var(as.vector(. %*% t(model@pp$X))) )
+
+# mcmc object (from coda package)
+post_mat <- as.mcmc(data.frame(V_rep, V_site, V_res, V_fix, row.names = NULL))
+
+summary(post_mat)
+plot(post_mat)
+
+head(post_mat)
+
+post_mat %>% data.frame %>% mutate(V_all = V_rep + V_site + V_res + V_fix,
+                                   P_rep = V_rep/(V_rep + V_site + V_res + V_fix),
+                                   P_site = V_site/(V_rep + V_site + V_res + V_fix),
+                                   P_res = V_res/(V_rep + V_site + V_res + V_fix),
+                                   P_fix = V_fix/(V_rep + V_site + V_res + V_fix),
+                                   P_all = P_rep + P_site + P_res + P_fix)          ->  post_mat2_plant.P
+
+```
+
+
+### Plant K
+```{r}
+# get all posterior samples
+post <- posterior_samples(modelb_plant.K)
+
+# we get what we need - for random effect
+V_rep <-post$sd_REPLICATE__Intercept^2 # making it variance
+V_site <-post$sd_SITE__Intercept^2
+V_res <- post$sigma^2 
+```
+
+
+```{r}
+# calculate variance for fixed effects
+
+# get a data frame of different posterior of fixed effects
+post_fix <- as.data.frame(t(post[,1:4]))
+
+# get a posterior of fixed effects
+V_fix <-  map_dbl(post_fix, ~ var(as.vector(. %*% t(model@pp$X))) )
+
+# mcmc object (from coda package)
+post_mat <- as.mcmc(data.frame(V_rep, V_site, V_res, V_fix, row.names = NULL))
+
+summary(post_mat)
+plot(post_mat)
+
+head(post_mat)
+
+post_mat %>% data.frame %>% mutate(V_all = V_rep + V_site + V_res + V_fix,
+                                   P_rep = V_rep/(V_rep + V_site + V_res + V_fix),
+                                   P_site = V_site/(V_rep + V_site + V_res + V_fix),
+                                   P_res = V_res/(V_rep + V_site + V_res + V_fix),
+                                   P_fix = V_fix/(V_rep + V_site + V_res + V_fix),
+                                   P_all = P_rep + P_site + P_res + P_fix)          ->  post_mat2_plant.K
+
+```
+
 
 ### Viz - Variance Components
 ```{r}
@@ -421,10 +507,12 @@ create_bayesVarTable <- function(posteriorVarianceDF, variableName) {
 
 propPost_plant.NPK <- create_bayesVarTable(post_mat2_plant.NPK, "plant.NPK")
 propPost_plant.N <- create_bayesVarTable(post_mat2_plant.N, "plant.N")
+propPost_plant.P <- create_bayesVarTable(post_mat2_plant.P, "plant.P")
+propPost_plant.K <- create_bayesVarTable(post_mat2_plant.K, "plant.K")
 
 
 # Combine
-propPost <- as.data.frame(rbind(propPost_plant.NPK, propPost_plant.N))
+propPost <- as.data.frame(rbind(propPost_plant.N, propPost_plant.P, propPost_plant.K))
  
 str(propPost)
 
@@ -478,11 +566,12 @@ propPost %>%
 # https://www.rensvandeschoot.com/tutorials/brms-started/
 # and learn and do more exploration with this and other ones
 
+library(MCMCglmm)
 mean(V_rep) # this is posterior mean (variance of random effect estimate)
 posterior.mode(V_rep) # posterior mode because variation is not normally distributed
 
 # post_mat note:
-#posterior should add up to one
+#   posterior should add up to one
 
 ```
 
