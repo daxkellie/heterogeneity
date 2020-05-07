@@ -291,19 +291,21 @@ bayes_R2(modelb_plant.NPK)
 bayes_R2(modelb_plant.N)
 bayes_R2(modelb_plant.P)
 bayes_R2(modelb_plant.K)
+bayes_R2(modelb_total.ag.biomass)
 ```
 
 
 ```{r}
 ggplot(data  = data_NutNet,
        aes(x = TREATMENT,
-           y = plant.NPK,
+           y = TOTAL.AG.BIOMASS,
            colour = TREATMENT))+
   geom_point(size = 1.2,
              alpha = .8,
              position = "jitter")+# to add some random noise for plotting purposes
   theme_minimal() + theme(legend.position = "none")
 ```
+
 ```{r}
 get_variables(modelb_plant.NPK)
 ```
@@ -575,8 +577,20 @@ propPost_plant.K <- create_bayesVarTable(post_mat2_plant.K, "plant.K")
 
 # Combine
 propPost <- as.data.frame(rbind(propPost_plant.N, propPost_plant.P, propPost_plant.K))
- 
+
+
+
+
+str(post_mat2_plant.N)
 str(propPost)
+
+# finding average proportions of all variables
+mean_P_rep <- ((post_mat2_plant.N$P_rep + post_mat2_plant.P$P_rep + post_mat2_plant.K$P_rep)/3)
+mean_P_site <- ((post_mat2_plant.N$P_site + post_mat2_plant.P$P_site + post_mat2_plant.K$P_site)/3)
+mean_P_res <- ((post_mat2_plant.N$P_res + post_mat2_plant.P$P_res + post_mat2_plant.K$P_res)/3)
+mean_P_fix <- ((post_mat2_plant.N$P_fix + post_mat2_plant.P$P_fix + post_mat2_plant.K$P_fix)/3)
+
+propPost_NutNet <- as.data.frame(cbind(mean_P_rep, mean_P_site, mean_P_res, mean_P_fix))
 
 
 # Summarised SE & mean values
