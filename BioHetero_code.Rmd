@@ -888,6 +888,13 @@ model0 <- lmer(z_soil_stab ~ z_non_inv_cover + (1 |ProjectName) , data = sdata_B
 summary(model0)
 hist(resid(model0)) 
 
+# model for Dax
+# random slope model
+model <- lmer(z_soil_stab ~ z_non_inv_cover + (1 + z_non_inv_cover|ProjectName) + (1 | Replicate), data = sdata_BLM)
+summary(model)
+hist(resid(model)) # Looks great
+
+
 ```
 
 
