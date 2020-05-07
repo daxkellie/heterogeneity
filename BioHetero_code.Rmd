@@ -264,10 +264,10 @@ varTable_NutNet %>%
 # modelb_plant.K <- brm(plant.K ~ TREATMENT + (1|SITE) + (1|REPLICATE), 
 #                         data = data_NutNet,
 #                         chains = 2, cores = 2)
-# K
-modelb_total.ag.biomass <- brm(TOTAL.AG.BIOMASS ~ TREATMENT + (1|SITE) + (1|REPLICATE),
-                        data = data_NutNet,
-                        chains = 2, cores = 2)
+# # K
+# modelb_total.ag.biomass <- brm(TOTAL.AG.BIOMASS ~ TREATMENT + (1|SITE) + (1|REPLICATE),
+#                         data = data_NutNet,
+#                         chains = 2, cores = 2)
 
 # Save models
 # saveRDS(modelb_plant.NPK, "model_plantNPK.rds")
@@ -284,6 +284,7 @@ modelb_plant.NPK <- readRDS("model_plantNPK.rds")
 modelb_plant.N <- readRDS("model_plantN.rds")
 modelb_plant.P <- readRDS("model_plantP.rds")
 modelb_plant.K <- readRDS("model_plantK.rds")
+modelb_total.ag.biomass <- readRDS("model_total.ag.biomass.rds")
 
 summary(modelb_plant.NPK)
 bayes_R2(modelb_plant.NPK)
