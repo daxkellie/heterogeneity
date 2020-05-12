@@ -821,6 +821,11 @@ varTable_CSV %>%
 
 ```
 
+
+
+
+
+
 # BLM Data
 Bureau of Land Management data
 
@@ -872,30 +877,62 @@ hist(data_BLM$NonInvPerenGrassCover_AH)
 dim(data_BLM)
 sum(complete.cases(data_BLM)) # OK this loses a lot of data
 
+```
+
+```{r}
+# Add Year to its own column
+list_years <- c("2000", "2001", "2002", "2003", "2004", 
+                "2005", "2006", "2007", "2008", "2009", 
+                "2010", "2011", "2012", "2013", "2014", 
+                "2015", "2016", "2017", "2018", "2019")
+
+data_BLM <- map_df(list_years, ~ filter(data_BLM, str_detect(ProjectName, .x)) %>%
+                    mutate(Year = str_extract(ProjectName, .x)))
+
+# Removing year from ProjectName
+data_BLM <- data_BLM %>%
+  mutate(
+    ProjectName = as.factor(gsub("([0-9]+).*$", "", ProjectName))
+  )
+
+
+# Create replicate variable
+data_BLM$Replicate <-  paste0(data_BLM$ProjectName, data_BLM$Year)
+```
+
+
+```{r}
 # we should get the total variance of 1
-data_BLM %>% mutate(z_soil_stab = scale(SoilStability_All), z_non_inv_cover = scale(NonInvPerenGrassCover_AH)) %>% select(ProjectName, z_soil_stab, z_non_inv_cover) -> sdata_BLM
+data_BLM %>% mutate(z_soil_stab = scale(SoilStability_All), z_non_inv_cover = scale(NonInvPerenGrassCover_AH)) %>% select(ProjectName, Replicate, z_soil_stab, z_non_inv_cover) -> sdata_BLM
 
 sdata_BLM <- sdata_BLM[complete.cases(sdata_BLM), ]
-#sdata_BLM
 
 # random slope model
-model <- lmer(z_soil_stab ~ z_non_inv_cover + (1 + z_non_inv_cover|ProjectName) , data = sdata_BLM)
+model <- lmer(z_soil_stab ~ z_non_inv_cover + (1 + z_non_inv_cover|ProjectName), 
+              data = sdata_BLM)
 summary(model)
 hist(resid(model)) # Looks great
 
 # random intercept model
-model0 <- lmer(z_soil_stab ~ z_non_inv_cover + (1 |ProjectName) , data = sdata_BLM)
+model0 <- lmer(z_soil_stab ~ z_non_inv_cover + (1 |ProjectName), 
+               data = sdata_BLM)
 summary(model0)
 hist(resid(model0)) 
 
 # model for Dax
 # random slope model
-model <- lmer(z_soil_stab ~ z_non_inv_cover + (1 + z_non_inv_cover|ProjectName) + (1 | Replicate), data = sdata_BLM)
+model <- lmer(z_soil_stab ~ z_non_inv_cover + (1 + z_non_inv_cover|ProjectName) + (1 | Replicate), 
+              data = sdata_BLM)
 summary(model)
 hist(resid(model)) # Looks great
 
 
 ```
+
+
+
+
+
 
 
 # Biodiversity x Drought
