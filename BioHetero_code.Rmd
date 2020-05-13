@@ -577,13 +577,10 @@ propPost_plant.K <- create_bayesVarTable(post_mat2_plant.K, "plant.K")
 
 # Combine
 propPost <- as.data.frame(rbind(propPost_plant.N, propPost_plant.P, propPost_plant.K))
+```
 
 
-
-
-str(post_mat2_plant.N)
-str(propPost)
-
+```{r}
 # finding average proportions of all variables
 mean_P_rep <- ((post_mat2_plant.N$P_rep + post_mat2_plant.P$P_rep + post_mat2_plant.K$P_rep)/3)
 mean_P_site <- ((post_mat2_plant.N$P_site + post_mat2_plant.P$P_site + post_mat2_plant.K$P_site)/3)
@@ -591,8 +588,10 @@ mean_P_res <- ((post_mat2_plant.N$P_res + post_mat2_plant.P$P_res + post_mat2_pl
 mean_P_fix <- ((post_mat2_plant.N$P_fix + post_mat2_plant.P$P_fix + post_mat2_plant.K$P_fix)/3)
 
 propPost_NutNet <- as.data.frame(cbind(mean_P_rep, mean_P_site, mean_P_res, mean_P_fix))
+```
 
 
+```{r, eval = FALSE, echo = FALSE}
 # Summarised SE & mean values
 propPost.sem <- propPost %>% 
   group_by(Variable, name) %>% 
@@ -835,22 +834,6 @@ data_BLM %>% head(5)
 dim(data_BLM)
 ```
 
-```{r}
-library(sf)
-library("rnaturalearth")
-library("rnaturalearthdata")
-
-world <- ne_countries(scale = "medium", returnclass = "sf")
-library(tidyverse)
-ggplot(data = world) +
-    geom_sf() +
-    geom_point(data = data_BLM, aes(x = Longitude, y = Latitude), size = 1, 
-               shape = 21, fill = "red") +
-    coord_sf(xlim = c(-180, 120), ylim = c(-80, 80), expand = FALSE) + 
-  theme_bw()
-
-```
-
 
 
 ## Example Model for Dax
@@ -879,6 +862,7 @@ sum(complete.cases(data_BLM)) # OK this loses a lot of data
 
 ```
 
+Create replicate variable
 ```{r}
 # Add Year to its own column
 list_years <- c("2000", "2001", "2002", "2003", "2004", 
@@ -932,13 +916,13 @@ hist(resid(model)) # Looks great
 ## Bayesian Model
 ```{r}
 # Soil Stability
-modelb_soil_stab <- brm(z_soil_stab ~ z_non_inv_cover + 
-                          (1 + z_non_inv_cover|ProjectName) + (1 | Replicate),
-                        data = sdata_BLM,
-                        chains = 2, cores = 2) # you can do more but 2 chains will be fine
+# modelb_soil_stab <- brm(z_soil_stab ~ z_non_inv_cover + 
+#                           (1 + z_non_inv_cover|ProjectName) + (1 | Replicate),
+#                         data = sdata_BLM,
+#                         chains = 2, cores = 2) # you can do more but 2 chains will be fine
 
 # Save models
-saveRDS(modelb_soil_stab, "modelb_soil_stab.rds")
+# saveRDS(modelb_soil_stab, "modelb_soil_stab.rds")
 
 ```
 
@@ -948,6 +932,132 @@ modelb_soil_stab <- readRDS("modelb_soil_stab.rds")
 ```
 
 
+### Soil Stability
+```{r}
+# get all posterior samples
+post <- posterior_samples(modelb_soil_stab)
+names(post)
+# we get what we need - for random effect
+V_rep <-post$sd_Replicate__Intercept^2 # making it variance
+V_site <-post$sd_ProjectName__Intercept^2 + post$sd_ProjectName__z_non_inv_cover
+V_res <- post$sigma^2 
+```
+
+
+```{r}
+# calculate variance for fixed effects
+
+# get a data frame of different posterior of fixed effects
+post_fix <- as.data.frame(t(post[,1:4]))
+
+# get a posterior of fixed effects
+V_fix <-  map_dbl(post_fix, ~ var(as.vector(. %*% t(model@pp$X))) ) # what do I do here
+
+# mcmc object (from coda package)
+post_mat <- as.mcmc(data.frame(V_rep, V_site, V_res, V_fix, row.names = NULL))
+
+summary(post_mat)
+plot(post_mat)
+
+head(post_mat)
+
+post_mat %>% data.frame %>% mutate(V_all = V_rep + V_site + V_res + V_fix,
+                                   P_rep = V_rep/(V_rep + V_site + V_res + V_fix),
+                                   P_site = V_site/(V_rep + V_site + V_res + V_fix),
+                                   P_res = V_res/(V_rep + V_site + V_res + V_fix),
+                                   P_fix = V_fix/(V_rep + V_site + V_res + V_fix),
+                                   P_all = P_rep + P_site + P_res + P_fix)          ->  post_mat2_soil_stab
+
+```
+
+
+
+
+
+```{r}
+# Function to create data frames
+create_bayesVarTable <- function(posteriorVarianceDF, variableName) {
+  # make variable name usable for character
+  varName <- as.character(variableName)
+  
+  # build data frame
+  dataFrame <- posteriorVarianceDF %>% 
+  mutate(
+    iteration = 1:length(post_mat2_plant.NPK$P_all), # make a col to represent each test
+    Variable = as.factor(paste(variableName))         # add Variable name
+  ) %>%
+  select(P_rep, P_site, P_res, P_fix, iteration, Variable) %>%
+  pivot_longer(c(-Variable, -iteration), values_to = "Variance") # flip the table
+}
+
+propPost_soil_stab <- create_bayesVarTable(post_mat2_soil_stab, "soil_stab")
+
+
+# Combine
+# propPost <- as.data.frame(rbind(propPost_plant.N, propPost_plant.P, propPost_plant.K))
+```
+
+
+```{r}
+# finding average proportions of all variables
+mean_P_rep <- ((post_mat2_plant.N$P_rep + post_mat2_plant.P$P_rep + post_mat2_plant.K$P_rep)/3)
+mean_P_site <- ((post_mat2_plant.N$P_site + post_mat2_plant.P$P_site + post_mat2_plant.K$P_site)/3)
+mean_P_res <- ((post_mat2_plant.N$P_res + post_mat2_plant.P$P_res + post_mat2_plant.K$P_res)/3)
+mean_P_fix <- ((post_mat2_plant.N$P_fix + post_mat2_plant.P$P_fix + post_mat2_plant.K$P_fix)/3)
+
+propPost_NutNet <- as.data.frame(cbind(mean_P_rep, mean_P_site, mean_P_res, mean_P_fix))
+```
+
+
+
+## Viz - Variance Components Bayesian
+```{r}
+library(ggthemes)
+
+propPost %>%
+    mutate(
+    name = as.factor(recode(name,
+                        "P_fix" = "Fixed",
+                        "P_rep" = "Replicate",
+                        "P_res" = "Residual",
+                        "P_site" = "Location"))
+  ) %>%
+  ggplot(aes(x = name, y = Variance, fill = name, colour = name)) + 
+  facet_grid(~Variable) +
+  stat_summary(fun.y = mean, geom = "bar", position = "dodge",width = 1, alpha = .8) +
+  stat_summary(fun.data = mean_cl_normal, geom = "errorbar", 
+               width = 0.15, position = position_dodge(width = 0.90), colour = "black") +
+  coord_cartesian(ylim = c(0, 1)) + 
+  scale_y_continuous(labels = scales::percent) +
+  labs(x = "Variance Components",
+       y = "Proportion of Total Variance") +
+  scale_fill_ptol() + scale_colour_ptol() + 
+  theme_minimal() + 
+  theme(legend.position = "none")
+```
+
+
+
+## Site Locations
+```{r}
+str(data_BLM)
+
+library(sf)
+library("rnaturalearth")
+library("rnaturalearthdata")
+
+world <- ne_countries(scale = "medium", returnclass = "sf")
+library(tidyverse)
+ggplot(data = world) +
+    geom_sf() +
+    geom_point(data = (data_BLM %>% 
+                         select(ProjectName, Longitude, Latitude) %>%
+                         unique()), 
+               aes(x = Longitude, y = Latitude), size = 1, 
+               shape = 21, fill = "red") +
+    coord_sf(xlim = c(-180, 120), ylim = c(-80, 80), expand = FALSE) + 
+  theme_bw()
+```
 
 
 
