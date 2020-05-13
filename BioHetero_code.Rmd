@@ -853,7 +853,7 @@ ggplot(data = world) +
 
 
 
-# Example Model for 
+## Example Model for Dax
 
 Dax says:
 
@@ -914,7 +914,7 @@ summary(model)
 hist(resid(model)) # Looks great
 
 # random intercept model
-model0 <- lmer(z_soil_stab ~ z_non_inv_cover + (1 |ProjectName), 
+model0 <- lmer(z_soil_stab ~ z_non_inv_cover + (1 |ProjectName) + (1 | Replicate), 
                data = sdata_BLM)
 summary(model0)
 hist(resid(model0)) 
@@ -929,7 +929,23 @@ hist(resid(model)) # Looks great
 
 ```
 
+## Bayesian Model
+```{r}
+# Soil Stability
+modelb_soil_stab <- brm(z_soil_stab ~ z_non_inv_cover + 
+                          (1 + z_non_inv_cover|ProjectName) + (1 | Replicate),
+                        data = sdata_BLM,
+                        chains = 2, cores = 2) # you can do more but 2 chains will be fine
 
+# Save models
+saveRDS(modelb_soil_stab, "modelb_soil_stab.rds")
+
+```
+
+```{r}
+# Load models
+modelb_soil_stab <- readRDS("modelb_soil_stab.rds")
+```
 
 
 
