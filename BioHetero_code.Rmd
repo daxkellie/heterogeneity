@@ -886,7 +886,7 @@ data_BLM$Replicate <-  paste0(data_BLM$ProjectName, data_BLM$Year)
 
 
 ```{r}
-# we should get the total variance of 1
+# z-transformations: we should get the total variance of 1 
 data_BLM %>% mutate(z_soil_stab = scale(SoilStability_All), z_non_inv_cover = scale(NonInvPerenGrassCover_AH)) %>% select(ProjectName, Replicate, z_soil_stab, z_non_inv_cover) -> sdata_BLM
 
 sdata_BLM <- sdata_BLM[complete.cases(sdata_BLM), ]
@@ -948,10 +948,12 @@ V_res <- post$sigma^2
 # calculate variance for fixed effects
 
 # get a data frame of different posterior of fixed effects
-post_fix <- as.data.frame(t(post[,1:4]))
+post_fix <- as.data.frame(t(post[,1:2]))
 
 # get a posterior of fixed effects
-V_fix <-  map_dbl(post_fix, ~ var(as.vector(. %*% t(model@pp$X))) ) # what do I do here
+V_fix <-  map_dbl(post_fix, ~ var(as.vector(. %*% t(model@pp$X))) )
+
+?map_dbl
 
 # mcmc object (from coda package)
 post_mat <- as.mcmc(data.frame(V_rep, V_site, V_res, V_fix, row.names = NULL))
