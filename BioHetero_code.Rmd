@@ -166,7 +166,7 @@ rep_plant.K <- rptGaussian(plant.K ~ TREATMENT + (1|SITE),
 rep_plant.K
 ```
 
-# Total AG Biomass
+Total AG Biomass
 ```{r}
 # Total AG Biomass
 rep_total.ag.biomass <- rptGaussian(TOTAL.AG.BIOMASS ~ TREATMENT + (1|SITE),
@@ -562,7 +562,7 @@ create_bayesVarTable <- function(posteriorVarianceDF, variableName) {
   # build data frame
   dataFrame <- posteriorVarianceDF %>% 
   mutate(
-    iteration = 1:length(post_mat2_plant.NPK$P_all), # make a col to represent each test
+    iteration = 1:length(posteriorVarianceDF$P_all), # make a col to represent each test
     Variable = as.factor(paste(variableName))         # add Variable name
   ) %>%
   select(P_rep, P_site, P_res, P_fix, iteration, Variable) %>%
@@ -834,6 +834,50 @@ data_BLM %>% head(5)
 dim(data_BLM)
 ```
 
+## Data Wrangling
+
+##### Limit data to arid grassland/steppe
+```{r}
+# Eliminate plots with >5% tree cover
+data_BLM <- data_BLM %>%
+  mutate(
+      sumTreeCover = select(., c(InvTreeCover_AH, NonInvTreeCover_AH)) %>% rowSums(na.rm = TRUE)) %>%
+  filter(sumTreeCover < 5)
+
+# Only include Project Sites with > 0% sagebrush cover
+data_BLM <- data_BLM %>% 
+  filter(SagebrushCover_AH > 0)
+
+# Only include Project Sites with > 0% invasive annual grass cover 
+# (this should mean that all regions at least have potential for 
+# invasion by annual grass)
+data_BLM <- data_BLM %>%
+  filter(InvAnnGrassCover_AH > 0)
+```
+
+Data set reduced from > 10,000 points to 2,812
+
+##### Create replicate variable
+```{r}
+# Add Year to its own column
+list_years <- c("2000", "2001", "2002", "2003", "2004", 
+                "2005", "2006", "2007", "2008", "2009", 
+                "2010", "2011", "2012", "2013", "2014", 
+                "2015", "2016", "2017", "2018", "2019")
+
+data_BLM <- map_df(list_years, ~ filter(data_BLM, str_detect(ProjectName, .x)) %>%
+                    mutate(Year = str_extract(ProjectName, .x)))
+
+# Removing year from ProjectName
+data_BLM <- data_BLM %>%
+  mutate(
+    ProjectName = as.factor(gsub("([0-9]+).*$", "", ProjectName))
+  )
+
+
+# Create replicate variable
+data_BLM$Replicate <-  paste0(data_BLM$ProjectName, data_BLM$Year)
+```
 
 
 ## Example Model for Dax
@@ -862,32 +906,14 @@ sum(complete.cases(data_BLM)) # OK this loses a lot of data
 
 ```
 
-Create replicate variable
-```{r}
-# Add Year to its own column
-list_years <- c("2000", "2001", "2002", "2003", "2004", 
-                "2005", "2006", "2007", "2008", "2009", 
-                "2010", "2011", "2012", "2013", "2014", 
-                "2015", "2016", "2017", "2018", "2019")
-
-data_BLM <- map_df(list_years, ~ filter(data_BLM, str_detect(ProjectName, .x)) %>%
-                    mutate(Year = str_extract(ProjectName, .x)))
-
-# Removing year from ProjectName
-data_BLM <- data_BLM %>%
-  mutate(
-    ProjectName = as.factor(gsub("([0-9]+).*$", "", ProjectName))
-  )
-
-
-# Create replicate variable
-data_BLM$Replicate <-  paste0(data_BLM$ProjectName, data_BLM$Year)
-```
-
 
 ```{r}
 # z-transformations: we should get the total variance of 1 
-data_BLM %>% mutate(z_soil_stab = scale(SoilStability_All), z_non_inv_cover = scale(NonInvPerenGrassCover_AH)) %>% select(ProjectName, Replicate, z_soil_stab, z_non_inv_cover) -> sdata_BLM
+data_BLM %>% 
+  mutate(
+    z_soil_stab = scale(SoilStability_All), 
+    z_non_inv_cover = scale(NonInvPerenGrassCover_AH)) %>% 
+  select(ProjectName, Replicate, z_soil_stab, z_non_inv_cover) -> sdata_BLM
 
 sdata_BLM <- sdata_BLM[complete.cases(sdata_BLM), ]
 
@@ -904,16 +930,22 @@ summary(model0)
 hist(resid(model0)) 
 
 # model for Dax
-# random slope model
+
+```
+
+
+### Soil Stability
+
+Check model residuals
+```{r}
+# random slope model (using lmer)
 model <- lmer(z_soil_stab ~ z_non_inv_cover + (1 + z_non_inv_cover|ProjectName) + (1 | Replicate), 
               data = sdata_BLM)
 summary(model)
 hist(resid(model)) # Looks great
-
-
 ```
 
-## Bayesian Model
+Bayesian model
 ```{r}
 # Soil Stability
 # modelb_soil_stab <- brm(z_soil_stab ~ z_non_inv_cover + 
@@ -932,11 +964,11 @@ modelb_soil_stab <- readRDS("modelb_soil_stab.rds")
 ```
 
 
-### Soil Stability
 ```{r}
 # get all posterior samples
 post <- posterior_samples(modelb_soil_stab)
 names(post)
+
 # we get what we need - for random effect
 V_rep <-post$sd_Replicate__Intercept^2 # making it variance
 V_site <-post$sd_ProjectName__Intercept^2 + post$sd_ProjectName__z_non_inv_cover
@@ -945,7 +977,7 @@ V_res <- post$sigma^2
 
 
 ```{r}
-# calculate variance for fixed effects
+## Calculate variance for fixed effects
 
 # get a data frame of different posterior of fixed effects
 post_fix <- as.data.frame(t(post[,1:2]))
@@ -973,9 +1005,23 @@ post_mat %>% data.frame %>% mutate(V_all = V_rep + V_site + V_res + V_fix,
 ```
 
 
+## Var 2
+
+Bayesian model
+```{r}
+# Soil Stability
+# modelb_soil_stab <- brm(z_soil_stab ~ z_non_inv_cover + 
+#                           (1 + z_non_inv_cover|ProjectName) + (1 | Replicate),
+#                         data = sdata_BLM,
+#                         chains = 2, cores = 2) # you can do more but 2 chains will be fine
+
+# Save models
+# saveRDS(modelb_soil_stab, "modelb_soil_stab.rds")
+
+```
 
 
-
+Create data frames of variance components
 ```{r}
 # Function to create data frames
 create_bayesVarTable <- function(posteriorVarianceDF, variableName) {
@@ -985,7 +1031,7 @@ create_bayesVarTable <- function(posteriorVarianceDF, variableName) {
   # build data frame
   dataFrame <- posteriorVarianceDF %>% 
   mutate(
-    iteration = 1:length(post_mat2_plant.NPK$P_all), # make a col to represent each test
+    iteration = 1:length(posteriorVarianceDF$P_all), # make a col to represent each test
     Variable = as.factor(paste(variableName))         # add Variable name
   ) %>%
   select(P_rep, P_site, P_res, P_fix, iteration, Variable) %>%
