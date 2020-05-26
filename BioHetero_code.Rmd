@@ -912,7 +912,10 @@ sum(complete.cases(data_BLM)) # OK this loses a lot of data
 data_BLM %>% 
   mutate(
     z_soil_stab = scale(SoilStability_All), 
-    z_non_inv_cover = scale(NonInvPerenGrassCover_AH)) %>% 
+    z_non_inv_grass_cover = scale(NonInvPerenGrassCover_AH),
+    z_non_inv_forb_cover = scale(NonInvPerenForbCover_AH),
+    z_non_inv_shrub_cover = scale(NonInvShrubCover_AH)
+    ) %>% 
   select(ProjectName, Replicate, z_soil_stab, z_non_inv_cover) -> sdata_BLM
 
 sdata_BLM <- sdata_BLM[complete.cases(sdata_BLM), ]
@@ -934,12 +937,13 @@ hist(resid(model0))
 ```
 
 
-### Soil Stability
+### Non-Invasive Grass Cover
 
 Check model residuals
 ```{r}
 # random slope model (using lmer)
-model <- lmer(z_soil_stab ~ z_non_inv_cover + (1 + z_non_inv_cover|ProjectName) + (1 | Replicate), 
+model <- lmer(z_soil_stab ~ z_non_inv_grass_cover + 
+                (1 + z_non_inv_grass_cover|ProjectName) + (1 | Replicate), 
               data = sdata_BLM)
 summary(model)
 hist(resid(model)) # Looks great
@@ -1005,7 +1009,7 @@ post_mat %>% data.frame %>% mutate(V_all = V_rep + V_site + V_res + V_fix,
 ```
 
 
-## Var 2
+### Non-Invasive Forb Cover
 
 Bayesian model
 ```{r}
@@ -1019,6 +1023,17 @@ Bayesian model
 # saveRDS(modelb_soil_stab, "modelb_soil_stab.rds")
 
 ```
+
+
+### Non-Invase Shrub Cover
+### Sagebrush Cover
+### Invasive Annual Grass Cover
+### Invase Annual Forb/Grass Cover
+### Total Foliar Cover
+
+
+
+
 
 
 Create data frames of variance components
