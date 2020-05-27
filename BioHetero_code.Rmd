@@ -971,7 +971,7 @@ Bayesian model
 
 ```{r}
 # Load models
-modelb_nonInv_grass_cover <- readRDS("modelb_nonInv_grass_cover")
+modelb_nonInv_grass_cover <- readRDS("modelb_nonInv_grass_cover.rds")
 ```
 
 
@@ -995,8 +995,6 @@ post_fix <- as.data.frame(t(post[,1:2]))
 
 # get a posterior of fixed effects
 V_fix <-  map_dbl(post_fix, ~ var(as.vector(. %*% t(model@pp$X))) )
-
-?map_dbl
 
 # mcmc object (from coda package)
 post_mat <- as.mcmc(data.frame(V_rep, V_site, V_res, V_fix, row.names = NULL))
@@ -1047,7 +1045,7 @@ Bayesian model
 
 ```{r}
 # Load models
-modelb_nonInv_forb_cover <- readRDS("modelb_nonInv_forb_cover")
+modelb_nonInv_forb_cover <- readRDS("modelb_nonInv_forb_cover.rds")
 ```
 
 
@@ -1115,13 +1113,13 @@ Bayesian model
 #                         chains = 2, cores = 2) # you can do more but 2 chains will be fine
 
 # Save models
-# saveRDS(modelb_nonInv_shrub_cover, "modelb_nonInv_shrub_cover")
+# saveRDS(modelb_nonInv_shrub_cover, "modelb_nonInv_shrub_cover.rds")
 
 ```
 
 ```{r}
 # Load models
-modelb_nonInv_shrub_cover <- readRDS("modelb_nonInv_shrub_cover")
+modelb_nonInv_shrub_cover <- readRDS("modelb_nonInv_shrub_cover.rds")
 ```
 
 
@@ -1186,19 +1184,62 @@ hist(resid(model)) # Looks great
 Bayesian model
 ```{r}
 # modelb_sagebrush_cover <- brm(z_soil_stab ~ z_sagebrush_cover +
-#                           (1 + z_nonInv_shrub_cover|ProjectName) + (1 | Replicate),
+#                           (1 + z_sagebrush_cover|ProjectName) + (1 | Replicate),
 #                         data = sdata_BLM,
 #                         chains = 2, cores = 2) # you can do more but 2 chains will be fine
 
 # Save models
-# saveRDS(modelb_sagebrush_cover, "modelb_sagebrush_cover")
+# saveRDS(modelb_sagebrush_cover, "modelb_sagebrush_cover.rds")
 
 ```
 
 ```{r}
 # Load models
-modelb_sagebrush_cover <- readRDS("modelb_sagebrush_cover")
+modelb_sagebrush_cover <- readRDS("modelb_sagebrush_cover.rds")
 ```
+
+```{r}
+# get all posterior samples
+post <- posterior_samples(modelb_sagebrush_cover)
+# names(post)
+
+# we get what we need - for random effect
+V_rep <-post$sd_Replicate__Intercept^2 # making it variance
+V_site <-post$sd_ProjectName__Intercept^2 + post$sd_ProjectName__z_sagebrush_cover
+V_res <- post$sigma^2 
+```
+
+
+```{r}
+## Calculate variance for fixed effects
+
+# get a data frame of different posterior of fixed effects
+post_fix <- as.data.frame(t(post[,1:2]))
+
+# get a posterior of fixed effects
+V_fix <-  map_dbl(post_fix, ~ var(as.vector(. %*% t(model@pp$X))) )
+
+# mcmc object (from coda package)
+post_mat <- as.mcmc(data.frame(V_rep, V_site, V_res, V_fix, row.names = NULL))
+
+summary(post_mat)
+plot(post_mat)  # This model has a bit of difficulty
+
+# Calculate proportions from posterior
+post_mat %>% 
+  data.frame %>% 
+  mutate(V_all = V_rep + V_site + V_res + V_fix,
+         P_rep = V_rep/(V_rep + V_site + V_res + V_fix),
+         P_site = V_site/(V_rep + V_site + V_res + V_fix),
+         P_res = V_res/(V_rep + V_site + V_res + V_fix),
+         P_fix = V_fix/(V_rep + V_site + V_res + V_fix),
+         P_all = P_rep + P_site + P_res + P_fix)          ->  post_mat2_sagebrush_cover
+
+```
+
+
+
+
 
 
 
@@ -1223,14 +1264,59 @@ Bayesian model
 #                         chains = 2, cores = 2) # you can do more but 2 chains will be fine
 
 # Save models
-# saveRDS(modelb_inv_ann_grass_cover, "modelb_inv_ann_grass_cover")
+# saveRDS(modelb_inv_ann_grass_cover, "modelb_inv_ann_grass_cover.rds")
 
 ```
 
 ```{r}
 # Load models
-modelb_inv_ann_grass_cover <- readRDS("modelb_inv_ann_grass_cover")
+modelb_inv_ann_grass_cover <- readRDS("modelb_inv_ann_grass_cover.rds")
 ```
+
+```{r}
+# get all posterior samples
+post <- posterior_samples(modelb_inv_ann_grass_cover)
+# names(post)
+
+# we get what we need - for random effect
+V_rep <-post$sd_Replicate__Intercept^2 # making it variance
+V_site <-post$sd_ProjectName__Intercept^2 + post$sd_ProjectName__z_inv_ann_grass_cover
+V_res <- post$sigma^2 
+```
+
+
+```{r}
+## Calculate variance for fixed effects
+
+# get a data frame of different posterior of fixed effects
+post_fix <- as.data.frame(t(post[,1:2]))
+
+# get a posterior of fixed effects
+V_fix <-  map_dbl(post_fix, ~ var(as.vector(. %*% t(model@pp$X))) )
+
+# mcmc object (from coda package)
+post_mat <- as.mcmc(data.frame(V_rep, V_site, V_res, V_fix, row.names = NULL))
+
+summary(post_mat)
+plot(post_mat)
+
+# Calculate proportions from posterior
+post_mat %>% 
+  data.frame %>% 
+  mutate(V_all = V_rep + V_site + V_res + V_fix,
+         P_rep = V_rep/(V_rep + V_site + V_res + V_fix),
+         P_site = V_site/(V_rep + V_site + V_res + V_fix),
+         P_res = V_res/(V_rep + V_site + V_res + V_fix),
+         P_fix = V_fix/(V_rep + V_site + V_res + V_fix),
+         P_all = P_rep + P_site + P_res + P_fix)          ->  post_mat2_inv_ann_grass_cover
+
+```
+
+
+
+
+
+
 
 
 ### Invasive Annual Forb/Grass Cover
@@ -1254,14 +1340,57 @@ Bayesian model
 #                         chains = 2, cores = 2) # you can do more but 2 chains will be fine
 
 # Save models
-# saveRDS(modelb_inv_ann_forb_cover, "modelb_inv_ann_forb_cover")
+# saveRDS(modelb_inv_ann_forb_cover, "modelb_inv_ann_forb_cover.rds")
 
 ```
 
 ```{r}
 # Load models
-modelb_inv_ann_forb_cover <- readRDS("modelb_inv_ann_forb_cover")
+modelb_inv_ann_forb_cover <- readRDS("modelb_inv_ann_forb_cover.rds")
 ```
+
+```{r}
+# get all posterior samples
+post <- posterior_samples(modelb_inv_ann_forb_cover)
+# names(post)
+
+# we get what we need - for random effect
+V_rep <-post$sd_Replicate__Intercept^2 # making it variance
+V_site <-post$sd_ProjectName__Intercept^2 + post$sd_ProjectName__z_inv_ann_forb_cover
+V_res <- post$sigma^2 
+```
+
+
+```{r}
+## Calculate variance for fixed effects
+
+# get a data frame of different posterior of fixed effects
+post_fix <- as.data.frame(t(post[,1:2]))
+
+# get a posterior of fixed effects
+V_fix <-  map_dbl(post_fix, ~ var(as.vector(. %*% t(model@pp$X))) )
+
+# mcmc object (from coda package)
+post_mat <- as.mcmc(data.frame(V_rep, V_site, V_res, V_fix, row.names = NULL))
+
+summary(post_mat)
+plot(post_mat) # Some huge tails on these estimates, likely due to small fixed effects
+
+# Calculate proportions from posterior
+post_mat %>% 
+  data.frame %>% 
+  mutate(V_all = V_rep + V_site + V_res + V_fix,
+         P_rep = V_rep/(V_rep + V_site + V_res + V_fix),
+         P_site = V_site/(V_rep + V_site + V_res + V_fix),
+         P_res = V_res/(V_rep + V_site + V_res + V_fix),
+         P_fix = V_fix/(V_rep + V_site + V_res + V_fix),
+         P_all = P_rep + P_site + P_res + P_fix)          ->  post_mat2_inv_ann_forb_cover
+
+```
+
+
+
+
 
 ### Total Foliar Cover
 
@@ -1284,13 +1413,52 @@ Bayesian model
 #                         chains = 2, cores = 2) # you can do more but 2 chains will be fine
 
 # Save models
-# saveRDS(modelb_total_foliar_cover, "modelb_total_foliar_cover")
+# saveRDS(modelb_total_foliar_cover, "modelb_total_foliar_cover.rds")
 
 ```
 
 ```{r}
 # Load models
-modelb_total_foliar_cover <- readRDS("modelb_total_foliar_cover")
+modelb_total_foliar_cover <- readRDS("modelb_total_foliar_cover.rds")
+```
+
+```{r}
+# get all posterior samples
+post <- posterior_samples(modelb_total_foliar_cover)
+# names(post)
+
+# we get what we need - for random effect
+V_rep <-post$sd_Replicate__Intercept^2 # making it variance
+V_site <-post$sd_ProjectName__Intercept^2 + post$sd_ProjectName__z_total_foliar_cover
+V_res <- post$sigma^2 
+```
+
+
+```{r}
+## Calculate variance for fixed effects
+
+# get a data frame of different posterior of fixed effects
+post_fix <- as.data.frame(t(post[,1:2]))
+
+# get a posterior of fixed effects
+V_fix <-  map_dbl(post_fix, ~ var(as.vector(. %*% t(model@pp$X))) )
+
+# mcmc object (from coda package)
+post_mat <- as.mcmc(data.frame(V_rep, V_site, V_res, V_fix, row.names = NULL))
+
+summary(post_mat)
+plot(post_mat)
+
+# Calculate proportions from posterior
+post_mat %>% 
+  data.frame %>% 
+  mutate(V_all = V_rep + V_site + V_res + V_fix,
+         P_rep = V_rep/(V_rep + V_site + V_res + V_fix),
+         P_site = V_site/(V_rep + V_site + V_res + V_fix),
+         P_res = V_res/(V_rep + V_site + V_res + V_fix),
+         P_fix = V_fix/(V_rep + V_site + V_res + V_fix),
+         P_all = P_rep + P_site + P_res + P_fix)          ->  post_mat2_total_foliar_cover
+
 ```
 
 ### Others
@@ -1299,7 +1467,7 @@ Tim also named Soil Stability Protected Surface Rating vs Soil Stability Unprote
 
 Not sure if this needs to be added (though my intuitions tell me probably not)
 
-
+## Variance Components
 Create data frames of variance components
 ```{r}
 # Function to create data frames
@@ -1318,10 +1486,19 @@ create_bayesVarTable <- function(posteriorVarianceDF, variableName) {
 }
 
 propPost_nonInv_grass_cover <- create_bayesVarTable(post_mat2_nonInv_grass_cover, "nonInv_grass_cover")
+propPost_nonInv_forb_cover <- create_bayesVarTable(post_mat2_nonInv_forb_cover, "nonInv_forb_cover")
+propPost_nonInv_shrub_cover <- create_bayesVarTable(post_mat2_nonInv_shrub_cover, "nonInv_shrub_cover")
+propPost_sagebrush_cover <- create_bayesVarTable(post_mat2_sagebrush_cover, "sagebrush_cover")
+propPost_inv_ann_grass_cover <- create_bayesVarTable(post_mat2_inv_ann_grass_cover, "inv_ann_grass_cover")
+propPost_inv_ann_forb_cover <- create_bayesVarTable(post_mat2_inv_ann_forb_cover, "inv_ann_forb_cover")
+propPost_total_foliar_cover <- create_bayesVarTable(post_mat2_total_foliar_cover, "total_foliar_cover")
 
 
 # Combine
-# propPost <- as.data.frame(rbind(propPost_plant.N, propPost_plant.P, propPost_plant.K))
+propPost <- as.data.frame(rbind(propPost_nonInv_grass_cover, propPost_nonInv_forb_cover,
+                                propPost_nonInv_shrub_cover, propPost_sagebrush_cover,
+                                propPost_inv_ann_grass_cover, propPost_inv_ann_forb_cover,
+                                propPost_total_foliar_cover))
 ```
 
 
@@ -1349,8 +1526,8 @@ propPost %>%
                         "P_res" = "Residual",
                         "P_site" = "Location"))
   ) %>%
-  ggplot(aes(x = name, y = Variance, fill = name, colour = name)) + 
-  facet_grid(~Variable) +
+  ggplot(aes(x = Variable, y = Variance, fill = name, colour = name)) + 
+  facet_grid(~name) +
   stat_summary(fun.y = mean, geom = "bar", position = "dodge",width = 1, alpha = .8) +
   stat_summary(fun.data = mean_cl_normal, geom = "errorbar", 
                width = 0.15, position = position_dodge(width = 0.90), colour = "black") +
@@ -1360,15 +1537,13 @@ propPost %>%
        y = "Proportion of Total Variance") +
   scale_fill_ptol() + scale_colour_ptol() + 
   theme_minimal() + 
-  theme(legend.position = "none")
+  theme(legend.position = "top")
 ```
 
 
 
 ## Site Locations
 ```{r}
-str(data_BLM)
-
 library(sf)
 library("rnaturalearth")
 library("rnaturalearthdata")
