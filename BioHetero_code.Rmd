@@ -857,6 +857,9 @@ data_BLM <- data_BLM %>%
 
 Data set reduced from > 10,000 points to 2,812
 
+
+
+
 ##### Create replicate variable
 ```{r}
 # Add Year to its own column
@@ -880,6 +883,8 @@ data_BLM$Replicate <-  paste0(data_BLM$ProjectName, data_BLM$Year)
 ```
 
 
+
+
 ## Example Model for Dax
 
 Dax says:
@@ -891,7 +896,6 @@ __PlotID__: Name for each location or "plot" where data is collected, as assigne
 __PlotKey__: Unique numeric ID associated with each plot location. This is automatically generated in DIMA the first time the plot is created. Future visits to the same plot might use the same PlotKey. Users are encouraged to use spatial joins to track trend over time.
 (So sometimes, but not always, there may be multiple years of data for a plot location, which is tracked using this variable)
 
-<!-- Note: OK - this is good but I now see we need to recode PlotID to use this (so we cannot use PlotID as they as when we fit in the mixed model (very much like we did for other datasets. -->
 
 ```{r}
 # transforming some of the data
@@ -908,32 +912,36 @@ sum(complete.cases(data_BLM)) # OK this loses a lot of data
 
 
 ```{r}
-# z-transformations: we should get the total variance of 1 
+# z-transformations
+# This makes it so that we should get a total variance of 1 
 data_BLM %>% 
   mutate(
     z_soil_stab = scale(SoilStability_All), 
-    z_non_inv_grass_cover = scale(NonInvPerenGrassCover_AH),
-    z_non_inv_forb_cover = scale(NonInvPerenForbCover_AH),
-    z_non_inv_shrub_cover = scale(NonInvShrubCover_AH)
+    z_nonInv_grass_cover = scale(NonInvPerenGrassCover_AH),
+    z_nonInv_forb_cover = scale(NonInvPerenForbCover_AH),
+    z_nonInv_shrub_cover = scale(NonInvShrubCover_AH),
+    z_sagebrush_cover = scale(SagebrushCover_AH),
+    z_inv_ann_grass_cover = scale(InvAnnGrassCover_AH),
+    z_inv_ann_forb_cover = scale(InvAnnForbCover_AH),
+    z_total_foliar_cover = scale(TotalFoliarCover_FH)
     ) %>% 
-  select(ProjectName, Replicate, z_soil_stab, z_non_inv_cover) -> sdata_BLM
+  select(ProjectName, Replicate, z_soil_stab, z_nonInv_grass_cover,
+         z_nonInv_forb_cover, z_nonInv_shrub_cover, z_sagebrush_cover,
+         z_inv_ann_grass_cover, z_inv_ann_forb_cover, z_total_foliar_cover) -> sdata_BLM
 
 sdata_BLM <- sdata_BLM[complete.cases(sdata_BLM), ]
 
 # random slope model
-model <- lmer(z_soil_stab ~ z_non_inv_cover + (1 + z_non_inv_cover|ProjectName), 
+model <- lmer(z_soil_stab ~ z_nonInv_grass_cover + (1 + z_nonInv_grass_cover|ProjectName), 
               data = sdata_BLM)
 summary(model)
 hist(resid(model)) # Looks great
 
 # random intercept model
-model0 <- lmer(z_soil_stab ~ z_non_inv_cover + (1 |ProjectName) + (1 | Replicate), 
+model0 <- lmer(z_soil_stab ~ z_nonInv_grass_cover + (1 |ProjectName) + (1 | Replicate), 
                data = sdata_BLM)
 summary(model0)
 hist(resid(model0)) 
-
-# model for Dax
-
 ```
 
 
@@ -942,8 +950,8 @@ hist(resid(model0))
 Check model residuals
 ```{r}
 # random slope model (using lmer)
-model <- lmer(z_soil_stab ~ z_non_inv_grass_cover + 
-                (1 + z_non_inv_grass_cover|ProjectName) + (1 | Replicate), 
+model <- lmer(z_soil_stab ~ z_nonInv_grass_cover + 
+                (1 + z_nonInv_grass_cover|ProjectName) + (1 | Replicate), 
               data = sdata_BLM)
 summary(model)
 hist(resid(model)) # Looks great
@@ -951,31 +959,30 @@ hist(resid(model)) # Looks great
 
 Bayesian model
 ```{r}
-# Soil Stability
-# modelb_soil_stab <- brm(z_soil_stab ~ z_non_inv_cover + 
-#                           (1 + z_non_inv_cover|ProjectName) + (1 | Replicate),
+# modelb_nonInv_grass_cover <- brm(z_soil_stab ~ z_nonInv_grass_cover +
+#                           (1 + z_nonInv_grass_cover|ProjectName) + (1 | Replicate),
 #                         data = sdata_BLM,
 #                         chains = 2, cores = 2) # you can do more but 2 chains will be fine
 
 # Save models
-# saveRDS(modelb_soil_stab, "modelb_soil_stab.rds")
+# saveRDS(modelb_nonInv_grass_cover, "modelb_nonInv_grass_cover.rds")
 
 ```
 
 ```{r}
 # Load models
-modelb_soil_stab <- readRDS("modelb_soil_stab.rds")
+modelb_nonInv_grass_cover <- readRDS("modelb_nonInv_grass_cover")
 ```
 
 
 ```{r}
 # get all posterior samples
-post <- posterior_samples(modelb_soil_stab)
-names(post)
+post <- posterior_samples(modelb_nonInv_grass_cover)
+# names(post)
 
 # we get what we need - for random effect
 V_rep <-post$sd_Replicate__Intercept^2 # making it variance
-V_site <-post$sd_ProjectName__Intercept^2 + post$sd_ProjectName__z_non_inv_cover
+V_site <-post$sd_ProjectName__Intercept^2 + post$sd_ProjectName__z_nonInv_grass_cover
 V_res <- post$sigma^2 
 ```
 
@@ -997,43 +1004,300 @@ post_mat <- as.mcmc(data.frame(V_rep, V_site, V_res, V_fix, row.names = NULL))
 summary(post_mat)
 plot(post_mat)
 
-head(post_mat)
-
-post_mat %>% data.frame %>% mutate(V_all = V_rep + V_site + V_res + V_fix,
-                                   P_rep = V_rep/(V_rep + V_site + V_res + V_fix),
-                                   P_site = V_site/(V_rep + V_site + V_res + V_fix),
-                                   P_res = V_res/(V_rep + V_site + V_res + V_fix),
-                                   P_fix = V_fix/(V_rep + V_site + V_res + V_fix),
-                                   P_all = P_rep + P_site + P_res + P_fix)          ->  post_mat2_soil_stab
+# Calculate proportions from posterior
+post_mat %>% 
+  data.frame %>% 
+  mutate(V_all = V_rep + V_site + V_res + V_fix,
+         P_rep = V_rep/(V_rep + V_site + V_res + V_fix),
+         P_site = V_site/(V_rep + V_site + V_res + V_fix),
+         P_res = V_res/(V_rep + V_site + V_res + V_fix),
+         P_fix = V_fix/(V_rep + V_site + V_res + V_fix),
+         P_all = P_rep + P_site + P_res + P_fix)          ->  post_mat2_nonInv_grass_cover
 
 ```
+
+
+
 
 
 ### Non-Invasive Forb Cover
 
+Check model residuals
+```{r}
+# random slope model (using lmer)
+model <- lmer(z_soil_stab ~ z_nonInv_forb_cover + 
+                (1 + z_nonInv_forb_cover|ProjectName) + (1 | Replicate), 
+              data = sdata_BLM)
+summary(model)
+hist(resid(model)) # Looks great
+```
+
+
 Bayesian model
 ```{r}
-# Soil Stability
-# modelb_soil_stab <- brm(z_soil_stab ~ z_non_inv_cover + 
-#                           (1 + z_non_inv_cover|ProjectName) + (1 | Replicate),
+# modelb_nonInv_forb_cover <- brm(z_soil_stab ~ z_nonInv_forb_cover +
+#                           (1 + z_nonInv_forb_cover|ProjectName) + (1 | Replicate),
 #                         data = sdata_BLM,
 #                         chains = 2, cores = 2) # you can do more but 2 chains will be fine
 
 # Save models
-# saveRDS(modelb_soil_stab, "modelb_soil_stab.rds")
+# saveRDS(modelb_nonInv_forb_cover, "modelb_nonInv_forb_cover.rds")
+
+```
+
+```{r}
+# Load models
+modelb_nonInv_forb_cover <- readRDS("modelb_nonInv_forb_cover")
+```
+
+
+```{r}
+# get all posterior samples
+post <- posterior_samples(modelb_nonInv_forb_cover)
+# names(post)
+
+# we get what we need - for random effect
+V_rep <-post$sd_Replicate__Intercept^2 # making it variance
+V_site <-post$sd_ProjectName__Intercept^2 + post$sd_ProjectName__z_nonInv_forb_cover
+V_res <- post$sigma^2 
+```
+
+
+```{r}
+## Calculate variance for fixed effects
+
+# get a data frame of different posterior of fixed effects
+post_fix <- as.data.frame(t(post[,1:2]))
+
+# get a posterior of fixed effects
+V_fix <-  map_dbl(post_fix, ~ var(as.vector(. %*% t(model@pp$X))) )
+
+# mcmc object (from coda package)
+post_mat <- as.mcmc(data.frame(V_rep, V_site, V_res, V_fix, row.names = NULL))
+
+summary(post_mat)
+plot(post_mat)
+
+# Calculate proportions from posterior
+post_mat %>% 
+  data.frame %>% 
+  mutate(V_all = V_rep + V_site + V_res + V_fix,
+         P_rep = V_rep/(V_rep + V_site + V_res + V_fix),
+         P_site = V_site/(V_rep + V_site + V_res + V_fix),
+         P_res = V_res/(V_rep + V_site + V_res + V_fix),
+         P_fix = V_fix/(V_rep + V_site + V_res + V_fix),
+         P_all = P_rep + P_site + P_res + P_fix)          ->  post_mat2_nonInv_forb_cover
 
 ```
 
 
-### Non-Invase Shrub Cover
+
+
+
+### Non-Invasive Shrub Cover
+
+Check model residuals
+```{r}
+# random slope model (using lmer)
+model <- lmer(z_soil_stab ~ z_nonInv_shrub_cover + 
+                (1 + z_nonInv_shrub_cover|ProjectName) + (1 | Replicate), 
+              data = sdata_BLM)
+summary(model)
+hist(resid(model)) # Looks great
+```
+
+
+Bayesian model
+```{r}
+# modelb_nonInv_shrub_cover <- brm(z_soil_stab ~ z_nonInv_shrub_cover +
+#                           (1 + z_nonInv_shrub_cover|ProjectName) + (1 | Replicate),
+#                         data = sdata_BLM,
+#                         chains = 2, cores = 2) # you can do more but 2 chains will be fine
+
+# Save models
+# saveRDS(modelb_nonInv_shrub_cover, "modelb_nonInv_shrub_cover")
+
+```
+
+```{r}
+# Load models
+modelb_nonInv_shrub_cover <- readRDS("modelb_nonInv_shrub_cover")
+```
+
+
+```{r}
+# get all posterior samples
+post <- posterior_samples(modelb_nonInv_shrub_cover)
+# names(post)
+
+# we get what we need - for random effect
+V_rep <-post$sd_Replicate__Intercept^2 # making it variance
+V_site <-post$sd_ProjectName__Intercept^2 + post$sd_ProjectName__z_nonInv_shrub_cover
+V_res <- post$sigma^2 
+```
+
+
+```{r}
+## Calculate variance for fixed effects
+
+# get a data frame of different posterior of fixed effects
+post_fix <- as.data.frame(t(post[,1:2]))
+
+# get a posterior of fixed effects
+V_fix <-  map_dbl(post_fix, ~ var(as.vector(. %*% t(model@pp$X))) )
+
+# mcmc object (from coda package)
+post_mat <- as.mcmc(data.frame(V_rep, V_site, V_res, V_fix, row.names = NULL))
+
+summary(post_mat)
+plot(post_mat)
+
+# Calculate proportions from posterior
+post_mat %>% 
+  data.frame %>% 
+  mutate(V_all = V_rep + V_site + V_res + V_fix,
+         P_rep = V_rep/(V_rep + V_site + V_res + V_fix),
+         P_site = V_site/(V_rep + V_site + V_res + V_fix),
+         P_res = V_res/(V_rep + V_site + V_res + V_fix),
+         P_fix = V_fix/(V_rep + V_site + V_res + V_fix),
+         P_all = P_rep + P_site + P_res + P_fix)          ->  post_mat2_nonInv_shrub_cover
+
+```
+
+
+
+
+
+
+
 ### Sagebrush Cover
+
+Check model residuals
+```{r}
+# random slope model (using lmer)
+model <- lmer(z_soil_stab ~ z_sagebrush_cover + 
+                (1 + z_sagebrush_cover|ProjectName) + (1 | Replicate), 
+              data = sdata_BLM)
+summary(model)
+hist(resid(model)) # Looks great
+```
+
+
+Bayesian model
+```{r}
+# modelb_sagebrush_cover <- brm(z_soil_stab ~ z_sagebrush_cover +
+#                           (1 + z_nonInv_shrub_cover|ProjectName) + (1 | Replicate),
+#                         data = sdata_BLM,
+#                         chains = 2, cores = 2) # you can do more but 2 chains will be fine
+
+# Save models
+# saveRDS(modelb_sagebrush_cover, "modelb_sagebrush_cover")
+
+```
+
+```{r}
+# Load models
+modelb_sagebrush_cover <- readRDS("modelb_sagebrush_cover")
+```
+
+
+
 ### Invasive Annual Grass Cover
-### Invase Annual Forb/Grass Cover
+
+Check model residuals
+```{r}
+# random slope model (using lmer)
+model <- lmer(z_soil_stab ~ z_inv_ann_grass_cover + 
+                (1 + z_inv_ann_grass_cover|ProjectName) + (1 | Replicate), 
+              data = sdata_BLM)
+summary(model)
+hist(resid(model)) # Looks great
+```
+
+
+Bayesian model
+```{r}
+# modelb_inv_ann_grass_cover <- brm(z_soil_stab ~ z_inv_ann_grass_cover +
+#                           (1 + z_inv_ann_grass_cover|ProjectName) + (1 | Replicate),
+#                         data = sdata_BLM,
+#                         chains = 2, cores = 2) # you can do more but 2 chains will be fine
+
+# Save models
+# saveRDS(modelb_inv_ann_grass_cover, "modelb_inv_ann_grass_cover")
+
+```
+
+```{r}
+# Load models
+modelb_inv_ann_grass_cover <- readRDS("modelb_inv_ann_grass_cover")
+```
+
+
+### Invasive Annual Forb/Grass Cover
+
+Check model residuals
+```{r}
+# random slope model (using lmer)
+model <- lmer(z_soil_stab ~ z_inv_ann_forb_cover + 
+                (1 + z_inv_ann_forb_cover|ProjectName) + (1 | Replicate), 
+              data = sdata_BLM)
+summary(model)
+hist(resid(model)) # Looks great
+```
+
+
+Bayesian model
+```{r}
+# modelb_inv_ann_forb_cover <- brm(z_soil_stab ~ z_inv_ann_forb_cover +
+#                           (1 + z_inv_ann_forb_cover|ProjectName) + (1 | Replicate),
+#                         data = sdata_BLM,
+#                         chains = 2, cores = 2) # you can do more but 2 chains will be fine
+
+# Save models
+# saveRDS(modelb_inv_ann_forb_cover, "modelb_inv_ann_forb_cover")
+
+```
+
+```{r}
+# Load models
+modelb_inv_ann_forb_cover <- readRDS("modelb_inv_ann_forb_cover")
+```
+
 ### Total Foliar Cover
 
+Check model residuals
+```{r}
+# random slope model (using lmer)
+model <- lmer(z_soil_stab ~ z_total_foliar_cover + 
+                (1 + z_total_foliar_cover|ProjectName) + (1 | Replicate), 
+              data = sdata_BLM)
+summary(model)
+hist(resid(model)) # Looks great
+```
 
 
+Bayesian model
+```{r}
+# modelb_total_foliar_cover <- brm(z_soil_stab ~ z_total_foliar_cover +
+#                           (1 + z_total_foliar_cover|ProjectName) + (1 | Replicate),
+#                         data = sdata_BLM,
+#                         chains = 2, cores = 2) # you can do more but 2 chains will be fine
 
+# Save models
+# saveRDS(modelb_total_foliar_cover, "modelb_total_foliar_cover")
+
+```
+
+```{r}
+# Load models
+modelb_total_foliar_cover <- readRDS("modelb_total_foliar_cover")
+```
+
+### Others
+
+Tim also named Soil Stability Protected Surface Rating vs Soil Stability Unprotected Surface Rating
+
+Not sure if this needs to be added (though my intuitions tell me probably not)
 
 
 Create data frames of variance components
@@ -1053,7 +1317,7 @@ create_bayesVarTable <- function(posteriorVarianceDF, variableName) {
   pivot_longer(c(-Variable, -iteration), values_to = "Variance") # flip the table
 }
 
-propPost_soil_stab <- create_bayesVarTable(post_mat2_soil_stab, "soil_stab")
+propPost_nonInv_grass_cover <- create_bayesVarTable(post_mat2_nonInv_grass_cover, "nonInv_grass_cover")
 
 
 # Combine
