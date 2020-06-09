@@ -33,15 +33,12 @@ rstan_options(auto_write = TRUE)
 data_CSV <- read.csv("Datasets/CSV_microcosms/data/milcu_etal2017.csv", header = TRUE)
 data_NutNet <- read.csv("Datasets/NutNet/data/Model2.SEM.plot.data.csv", header = TRUE)
 data_biomass <- read.csv("Datasets/RichnessDrought/data/biomass_1.2.csv", header = TRUE)
-data_BLM <- read.csv("Datasets/BLM/terradat_points_table.csv") # I do not think this is what we want
-# more to add here
-
-
+data_BLM <- read.csv("Datasets/BLM/terradat_points_table.csv")
 ```
 
 
-# Nutrient Network (NutNet)
-Anderson et al. (2018) model </b>
+# NutNet (Nutrient Network)
+Anderson et al. (2018) model </br>
 
 Test effect of Herbivory (FENCE; yes/no) & Eutrophication (Fertilizer; yes/no) on C, N, P & K
 
@@ -58,7 +55,7 @@ data_NutNet %>% head(5)
 ```
 
 
-Frequency Distribution
+Frequency Distributions
 ```{r}
 plot_frequencyDist <- function(df, variable) {
   
@@ -70,231 +67,23 @@ plot_frequencyDist <- function(df, variable) {
     labs(x = variable, y = "Frequency")
   
 }
-plot_frequencyDist(data_NutNet, "plant.NPK")
+
 plot_frequencyDist(data_NutNet, "plant.N")
 plot_frequencyDist(data_NutNet, "plant.P")
 plot_frequencyDist(data_NutNet, "plant.K")
 ```
 
-## Frequentist Model
+## Analysis
+create `REPLICATE` variable for analysis
 ```{r}
-# REPLICATE variable
+# create REPLICATE variable for analysis
 data_NutNet$REPLICATE <- paste0(data_NutNet$SITE, data_NutNet$TREATMENT)
-
-# Frequentist model
-model <- lmer(plant.NPK ~ TREATMENT + (1|SITE) + (1|REPLICATE), data = data_NutNet)
-summary(model)
-hist(resid(model)) # Note that there is an outlier
-
-# plant N
-data_NutNet$log_plant.N <- log(data_NutNet$plant.N) # note - log doesn't fix skew
-model <- lmer(log_plant.N ~ TREATMENT + (1|SITE) + (1|REPLICATE), data = data_NutNet)
-summary(model)
-hist(resid(model)) # Note that there is an outlier
-
-# plant P
-model <- lmer(plant.P ~ TREATMENT + (1|SITE) + (1|REPLICATE), data = data_NutNet)
-summary(model)
-hist(resid(model)) # Note that there is an outlier
-
-# plant K
-model <- lmer(plant.K ~ TREATMENT + (1|SITE) + (1|REPLICATE), data = data_NutNet)
-summary(model)
-hist(resid(model)) # Note that there is an outlier
-
-# total biomass
-model <- lmer(TOTAL.AG.BIOMASS ~ TREATMENT + (1|SITE) + (1|REPLICATE), data = data_NutNet)
-summary(model)
-hist(resid(model)) # Note that there is an outlier
-
-# Total Variance
-var(data_NutNet$plant.NPK)
-```
-
-**Note:** plant.N & plant.P both have an outlier skewing residuals. plant.K appears normally distributed.
-
-
-
-
-## rptR Repeatability analysis
-
-Plant NPK
-```{r}
-# Plant NPK
-rep_plant.NPK <- rptGaussian(plant.NPK ~ TREATMENT + (1|SITE),
-                 grname = c("SITE", "Fixed", "Residual"), 
-                 data = data_NutNet,
-                 ratio = FALSE,
-                 nboot = 100, parallel = TRUE, adjusted = FALSE)
-
-rep_plant.NPK
-```
-
-Plant N
-```{r}
-# Plant N
-rep_plant.N <- rptGaussian(plant.N ~ TREATMENT + (1|SITE),
-                 grname = c("SITE", "Fixed", "Residual"), 
-                 data = data_NutNet,
-                 ratio = FALSE,
-                 nboot = 100, parallel = TRUE, adjusted = FALSE)
-
-rep_plant.N
-```
-
-Plant P
-```{r}
-# Plant P
-rep_plant.P <- rptGaussian(plant.P ~ TREATMENT + (1|SITE),
-                 grname = c("SITE", "Fixed", "Residual"), 
-                 data = data_NutNet,
-                 ratio = FALSE,
-                 nboot = 100, parallel = TRUE, adjusted = FALSE)
-
-rep_plant.P
-```
-
-Plant K
-```{r}
-# Plant K
-rep_plant.K <- rptGaussian(plant.K ~ TREATMENT + (1|SITE),
-                 grname = c("SITE", "Fixed", "Residual"), 
-                 data = data_NutNet,
-                 ratio = FALSE,
-                 nboot = 100, parallel = TRUE, adjusted = FALSE)
-
-rep_plant.K
-```
-
-Total AG Biomass
-```{r}
-# Total AG Biomass
-rep_total.ag.biomass <- rptGaussian(TOTAL.AG.BIOMASS ~ TREATMENT + (1|SITE),
-                 grname = c("SITE", "Fixed", "Residual"), 
-                 data = data_NutNet,
-                 ratio = FALSE,
-                 nboot = 100, parallel = TRUE, adjusted = FALSE)
-
-rep_total.ag.biomass
 ```
 
 
-### Viz - Variance Components
-
-Pull variance values from rptR output 
-```{r}
-# Function to pull variance values from rptR output
-
-create_VarTable <- function(repOutput, VariableName, BioHetVariable) {
-  
-  # retrieve variance values
-  varTable <- as.data.frame(repOutput$R)
-  
-  # make name usable
-  VariableName <- as.character(VariableName)
-  
-  # Pivot table
-  varTable <- varTable %>% 
-  rename(., Location = paste0(BioHetVariable)) %>% # rename SITE
-  mutate(
-    Variable = as.factor(paste0(VariableName)) # Add data identifier column
-  ) %>%
-  pivot_longer(-Variable, names_to = "Components", values_to = "Variance") # flip the table
-  
-  # add percent of total variance column
-  varTable$percentVar <- varTable$Variance/(sum(varTable$Variance))*100
-  
-  return(varTable)
-}
-```
-
-Create tables with variance values
-```{r}
-
-varTable_plant.NPK <- create_VarTable(rep_plant.NPK, "plant.NPK", "SITE")
-varTable_plant.N <- create_VarTable(rep_plant.N, "plant.N", "SITE")
-varTable_plant.P <- create_VarTable(rep_plant.P, "plant.P", "SITE")
-varTable_plant.K <- create_VarTable(rep_plant.K, "plant.K", "SITE")
-varTable_total.ag.biomass <- create_VarTable(rep_total.ag.biomass, "total.ag.biomass", "SITE")
-
-# Create 
-varTable_NutNet <- rbind(varTable_plant.N, 
-                         varTable_plant.P, varTable_plant.K,
-                         varTable_total.ag.biomass)
-```
-
-*Plot*
-```{r}
-library(forcats)
-library(ggthemes)
-
-varTable_NutNet %>%
-  mutate(Components = fct_relevel(Components, 
-                                  "Fixed", "Residual", "Location")) %>%
-  
-  ggplot(aes(x = Variable, y = percentVar, fill = Components)) + 
-  geom_bar(stat = "identity", position = "stack", width = .4) +
-  geom_text(aes(label = paste0(round(percentVar, 0), "%")), 
-            position = "stack", hjust = 1, size = 2, check_overlap = FALSE) + 
-    scale_fill_ptol() + 
-    coord_flip() + 
-  ylab("Proportion of Variance (%)") + 
-    theme_minimal(base_size = 12)
-    theme(axis.title = element_blank(), panel.grid.major.y = element_blank(), 
-          legend.position = "top")
-
-```
-
-## Bayesian Model
-```{r, eval = FALSE}
-# Bayesian models
-# NPK
-# modelb_plant.NPK <- brm(plant.NPK ~ TREATMENT + (1|SITE) + (1|REPLICATE), 
-#                         data = data_NutNet,
-#                         chains = 2, cores = 2) # you can do more but 2 chains will be fine
-# N
-# modelb_plant.N <- brm(plant.N ~ TREATMENT + (1|SITE) + (1|REPLICATE), 
-#                         data = data_NutNet,
-#                         chains = 2, cores = 2)
-# P
-# modelb_plant.P <- brm(plant.P ~ TREATMENT + (1|SITE) + (1|REPLICATE), 
-#                         data = data_NutNet,
-#                         chains = 2, cores = 2)
-# K
-# modelb_plant.K <- brm(plant.K ~ TREATMENT + (1|SITE) + (1|REPLICATE), 
-#                         data = data_NutNet,
-#                         chains = 2, cores = 2)
-# # K
-# modelb_total.ag.biomass <- brm(TOTAL.AG.BIOMASS ~ TREATMENT + (1|SITE) + (1|REPLICATE),
-#                         data = data_NutNet,
-#                         chains = 2, cores = 2)
-
-# Save models
-# saveRDS(modelb_plant.NPK, "model_plantNPK.rds")
-# saveRDS(modelb_plant.N, "model_plantN.rds")
-# saveRDS(modelb_plant.P, "model_plantP.rds")
-# saveRDS(modelb_plant.K, "model_plantK.rds")
-# saveRDS(modelb_total.ag.biomass, "model_total.ag.biomass.rds")
-```
 
 
-```{r}
-# Load models
-modelb_plant.NPK <- readRDS("model_plantNPK.rds")
-modelb_plant.N <- readRDS("model_plantN.rds")
-modelb_plant.P <- readRDS("model_plantP.rds")
-modelb_plant.K <- readRDS("model_plantK.rds")
-modelb_total.ag.biomass <- readRDS("model_total.ag.biomass.rds")
-
-summary(modelb_plant.NPK)
-bayes_R2(modelb_plant.NPK)
-bayes_R2(modelb_plant.N)
-bayes_R2(modelb_plant.P)
-bayes_R2(modelb_plant.K)
-bayes_R2(modelb_total.ag.biomass)
-```
-
-
+### TEST
 ```{r}
 ggplot(data  = data_NutNet,
        aes(x = TREATMENT,
@@ -346,27 +135,71 @@ library(modelr)
 ```
 
 
-##### Plant NPK
+
+
+### Plant N
+
+Frequentist model
+```{r}
+# plant N
+model <- lmer(plant.N ~ TREATMENT + (1|SITE) + (1|REPLICATE), data = data_NutNet)
+summary(model)
+hist(resid(model)) # Note that there is an outlier
+
+# Total Variance
+var(data_NutNet$plant.N)
+```
+
+Variance Estimation (using rptR)
+```{r}
+# Plant N
+rep_plant.N <- rptGaussian(plant.N ~ TREATMENT + (1|SITE),
+                 grname = c("SITE", "Fixed", "Residual"), 
+                 data = data_NutNet,
+                 ratio = FALSE,
+                 nboot = 100, parallel = TRUE, adjusted = FALSE)
+
+rep_plant.N
+```
+
+Bayesian model
+```{r}
+# N
+# modelb_plant.N <- brm(plant.N ~ TREATMENT + (1|SITE) + (1|REPLICATE), 
+#                         data = data_NutNet,
+#                         chains = 2, cores = 2)
+
+# Save model
+# saveRDS(modelb_plant.N, "model_plantN.rds")
+```
+
+```{r}
+# Load model
+modelb_plant.N <- readRDS("model_plantN.rds")
+
+# bayesian R2 estimate of regression model
+bayes_R2(modelb_plant.N)
+```
+
+
 ```{r}
 # getting posterior of random effects for each
 # blups <- ranef(modelb, summary = F) # WHAT IS THIS DO I NEED IT
 
 # get all posterior samples
-post <- posterior_samples(modelb_plant.NPK)
+post <- posterior_samples(modelb_plant.N)
 names(post)
 
 # these three are important
 # [1] "b_Intercept"                                  "b_TREATMENTFence"                            
 #  [3] "b_TREATMENTNPK"                               "b_TREATMENTNPK_Fence"                        
 #  [5] "sd_REPLICLATE__Intercept"                     "sd_SITE__Intercept"                          
-#  [7] "sigma"         
+#  [7] "sigma"  
 
 # we get what we need - for random effect
 V_rep <-post$sd_REPLICATE__Intercept^2 # making it variance
 V_site <-post$sd_SITE__Intercept^2
 V_res <- post$sigma^2 
-    # Why is sigma equal to residual variance? 
-    # Don't we need sigma to calculate error of estimates in plots?
 ```
 
 
@@ -375,51 +208,17 @@ V_res <- post$sigma^2
 # get a posterior for fixed effect bits (you need to get this as one - it will be difficult to decompose these - why?)
 # I cannot seem to get a model matrix from brms so I am going to use lmer
 
-# get a data frame of different posterior of fixed effects
-post_fix <- as.data.frame(t(post[,1:4]))
-
-# get a posterior of fixed effects
-V_fix <-  map_dbl(post_fix, ~ var(as.vector(. %*% t(model@pp$X))) )
-
-# mcmc object (from coda package)
-post_mat <- as.mcmc(data.frame(V_rep, V_site, V_res, V_fix, row.names = NULL))
-
-summary(post_mat)
-plot(post_mat)
-
-head(post_mat)
-
-post_mat %>% data.frame %>% mutate(V_all = V_rep + V_site + V_res + V_fix,
-                                   P_rep = V_rep/(V_rep + V_site + V_res + V_fix),
-                                   P_site = V_site/(V_rep + V_site + V_res + V_fix),
-                                   P_res = V_res/(V_rep + V_site + V_res + V_fix),
-                                   P_fix = V_fix/(V_rep + V_site + V_res + V_fix),
-                                   P_all = P_rep + P_site + P_res + P_fix)          ->  post_mat2_plant.NPK
-
-```
-
-##### Plant N
-
-```{r}
-# get all posterior samples
-post <- posterior_samples(modelb_plant.N)
-
-# we get what we need - for random effect
-V_rep <-post$sd_REPLICATE__Intercept^2 # making it variance
-V_site <-post$sd_SITE__Intercept^2
-V_res <- post$sigma^2 
-```
-
-
-```{r}
-# calculate variance for fixed effects
+# calculate variance for fixed effects:
 
 # get a data frame of different posterior of fixed effects
 post_fix <- as.data.frame(t(post[,1:4]))
 
 # get a posterior of fixed effects
 V_fix <-  map_dbl(post_fix, ~ var(as.vector(. %*% t(model@pp$X))) )
+```
 
+
+```{r}
 # mcmc object (from coda package)
 post_mat <- as.mcmc(data.frame(V_rep, V_site, V_res, V_fix, row.names = NULL))
 
@@ -437,7 +236,49 @@ post_mat %>% data.frame %>% mutate(V_all = V_rep + V_site + V_res + V_fix,
 
 ```
 
-#### Plant P
+### Plant P
+
+Frequentist model
+```{r}
+# plant P
+model <- lmer(plant.P ~ TREATMENT + (1|SITE) + (1|REPLICATE), data = data_NutNet)
+summary(model)
+hist(resid(model)) # Note that there is an outlier
+```
+
+
+Variance Estimation (using rptR)
+```{r}
+# Plant P
+rep_plant.P <- rptGaussian(plant.P ~ TREATMENT + (1|SITE),
+                 grname = c("SITE", "Fixed", "Residual"), 
+                 data = data_NutNet,
+                 ratio = FALSE,
+                 nboot = 100, parallel = TRUE, adjusted = FALSE)
+
+rep_plant.P
+```
+
+
+Bayesian Analysis
+```{r}
+# P
+# modelb_plant.P <- brm(plant.P ~ TREATMENT + (1|SITE) + (1|REPLICATE), 
+#                         data = data_NutNet,
+#                         chains = 2, cores = 2)
+
+# Save model
+# saveRDS(modelb_plant.P, "model_plantP.rds")
+```
+
+```{r}
+# Load model
+modelb_plant.P <- readRDS("model_plantP.rds")
+
+# bayesian R2 estimate of regression model
+bayes_R2(modelb_plant.P)
+```
+
 ```{r}
 # get all posterior samples
 post <- posterior_samples(modelb_plant.P)
@@ -476,12 +317,53 @@ post_mat %>% data.frame %>% mutate(V_all = V_rep + V_site + V_res + V_fix,
 ```
 
 
-#### Plant K
+### Plant K
+
+Frequentist model
+```{r}
+# plant K
+model <- lmer(plant.K ~ TREATMENT + (1|SITE) + (1|REPLICATE), data = data_NutNet)
+summary(model)
+hist(resid(model)) # Seems meh, very pointy
+```
+
+
+Variance Estimation (using rptR)
+```{r}
+# Plant K
+rep_plant.K <- rptGaussian(plant.K ~ TREATMENT + (1|SITE),
+                 grname = c("SITE", "Fixed", "Residual"), 
+                 data = data_NutNet,
+                 ratio = FALSE,
+                 nboot = 100, parallel = TRUE, adjusted = FALSE)
+
+rep_plant.K
+```
+
+Bayesian Analysis
+```{r}
+# K
+# modelb_plant.K <- brm(plant.K ~ TREATMENT + (1|SITE) + (1|REPLICATE), 
+#                         data = data_NutNet,
+#                         chains = 2, cores = 2)
+
+# Save model
+# saveRDS(modelb_plant.K, "model_plantK.rds")
+```
+
+```{r}
+# Load model
+modelb_plant.K <- readRDS("model_plantK.rds")
+
+# bayesian R2 estimate of regression model
+bayes_R2(modelb_plant.K)
+```
+
 ```{r}
 # get all posterior samples
 post <- posterior_samples(modelb_plant.K)
 
-# we get what we need - for random effect
+# we get what we need - for random effects
 V_rep <-post$sd_REPLICATE__Intercept^2 # making it variance
 V_site <-post$sd_SITE__Intercept^2
 V_res <- post$sigma^2 
@@ -551,8 +433,121 @@ post_mat %>% data.frame %>% mutate(V_all = V_rep + V_site + V_res + V_fix,
 
 ```
 
+### Total AG Biomass
 
-### Viz - Variance Components
+Frequentist model
+```{r}
+# total biomass
+model <- lmer(TOTAL.AG.BIOMASS ~ TREATMENT + (1|SITE) + (1|REPLICATE), data = data_NutNet)
+summary(model)
+hist(resid(model)) # Note that there is an outlier
+```
+
+Variance Estimates (using rptR)
+```{r}
+# Total AG Biomass
+rep_total.ag.biomass <- rptGaussian(TOTAL.AG.BIOMASS ~ TREATMENT + (1|SITE),
+                 grname = c("SITE", "Fixed", "Residual"), 
+                 data = data_NutNet,
+                 ratio = FALSE,
+                 nboot = 100, parallel = TRUE, adjusted = FALSE)
+
+rep_total.ag.biomass
+```
+
+Bayesian Analysis
+```{r}
+# # total biomass
+# modelb_total.ag.biomass <- brm(TOTAL.AG.BIOMASS ~ TREATMENT + (1|SITE) + (1|REPLICATE),
+#                         data = data_NutNet,
+#                         chains = 2, cores = 2)
+
+# Save model
+# saveRDS(modelb_total.ag.biomass, "model_total.ag.biomass.rds")
+```
+
+```{r}
+# Load model
+modelb_total.ag.biomass <- readRDS("model_total.ag.biomass.rds")
+
+# bayesian R2 estimate of regression model
+bayes_R2(modelb_total.ag.biomass)
+```
+
+
+
+***
+
+
+
+## PLOTS
+
+### rptR
+
+Create data frame for plotting 
+```{r}
+# Function to pull variance values from rptR output
+
+create_VarTable <- function(repOutput, VariableName, BioHetVariable) {
+  
+  # retrieve variance values
+  varTable <- as.data.frame(repOutput$R)
+  
+  # make name usable
+  VariableName <- as.character(VariableName)
+  
+  # Pivot table
+  varTable <- varTable %>% 
+  rename(., Location = paste0(BioHetVariable)) %>% # rename SITE
+  mutate(
+    Variable = as.factor(paste0(VariableName)) # Add data identifier column
+  ) %>%
+  pivot_longer(-Variable, names_to = "Components", values_to = "Variance") # flip the table
+  
+  # add percent of total variance column
+  varTable$percentVar <- varTable$Variance/(sum(varTable$Variance))*100
+  
+  return(varTable)
+}
+```
+
+```{r}
+# Pull values for each variable and variance estimate
+varTable_plant.NPK <- create_VarTable(rep_plant.NPK, "plant.NPK", "SITE")
+varTable_plant.N <- create_VarTable(rep_plant.N, "plant.N", "SITE")
+varTable_plant.P <- create_VarTable(rep_plant.P, "plant.P", "SITE")
+varTable_plant.K <- create_VarTable(rep_plant.K, "plant.K", "SITE")
+varTable_total.ag.biomass <- create_VarTable(rep_total.ag.biomass, "total.ag.biomass", "SITE")
+
+# Create data frame with desired estimates
+varTable_NutNet <- rbind(varTable_plant.N, 
+                         varTable_plant.P, varTable_plant.K,
+                         varTable_total.ag.biomass)
+```
+
+*Variance Components Plot*
+```{r}
+library(forcats)
+library(ggthemes)
+
+varTable_NutNet %>%
+  mutate(Components = fct_relevel(Components, 
+                                  "Fixed", "Residual", "Location")) %>%
+  
+  ggplot(aes(x = Variable, y = percentVar, fill = Components)) + 
+  geom_bar(stat = "identity", position = "stack", width = .4) +
+  geom_text(aes(label = paste0(round(percentVar, 0), "%")), 
+            position = "stack", hjust = 1, size = 2, check_overlap = FALSE) + 
+    scale_fill_ptol() + 
+    coord_flip() + 
+  ylab("Proportion of Variance (%)") + 
+    theme_minimal(base_size = 12)
+    theme(axis.title = element_blank(), panel.grid.major.y = element_blank(), 
+          legend.position = "top")
+```
+
+
+### Bayes model
 ```{r}
 # Function to create data frames
 create_bayesVarTable <- function(posteriorVarianceDF, variableName) {
@@ -1106,7 +1101,7 @@ hist(resid(model)) # Looks great
 
 
 Bayesian model
-```{r}
+```{r, eval = FALSE}
 # modelb_nonInv_shrub_cover <- brm(z_soil_stab ~ z_nonInv_shrub_cover +
 #                           (1 + z_nonInv_shrub_cover|ProjectName) + (1 | Replicate),
 #                         data = sdata_BLM,
@@ -1182,7 +1177,7 @@ hist(resid(model)) # Looks great
 
 
 Bayesian model
-```{r}
+```{r, eval = FALSE}
 # modelb_sagebrush_cover <- brm(z_soil_stab ~ z_sagebrush_cover +
 #                           (1 + z_sagebrush_cover|ProjectName) + (1 | Replicate),
 #                         data = sdata_BLM,
@@ -1333,7 +1328,7 @@ hist(resid(model)) # Looks great
 
 
 Bayesian model
-```{r}
+```{r, eval = FALSE}
 # modelb_inv_ann_forb_cover <- brm(z_soil_stab ~ z_inv_ann_forb_cover +
 #                           (1 + z_inv_ann_forb_cover|ProjectName) + (1 | Replicate),
 #                         data = sdata_BLM,
@@ -1406,7 +1401,7 @@ hist(resid(model)) # Looks great
 
 
 Bayesian model
-```{r}
+```{r, eval = FALSE}
 # modelb_total_foliar_cover <- brm(z_soil_stab ~ z_total_foliar_cover +
 #                           (1 + z_total_foliar_cover|ProjectName) + (1 | Replicate),
 #                         data = sdata_BLM,
@@ -1463,8 +1458,8 @@ post_mat %>%
 
 ### Others
 
-Tim also named Soil Stability Protected Surface Rating vs Soil Stability Unprotected Surface Rating
-
+Tim also named 'Soil Stability Protected Surface Rating' vs 'Soil Stability Unprotected Surface Rating' as a possble variable combination.  
+  
 Not sure if this needs to be added (though my intuitions tell me probably not)
 
 ## Variance Components
@@ -1537,7 +1532,8 @@ propPost %>%
        y = "Proportion of Total Variance") +
   scale_fill_ptol() + scale_colour_ptol() + 
   theme_minimal() + 
-  theme(legend.position = "top")
+  theme(legend.position = "top",
+        axis.text.x = element_text(angle = -90, hjust = 1))
 ```
 
 
