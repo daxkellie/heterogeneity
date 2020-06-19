@@ -37,10 +37,10 @@ data_BLM <- read.csv("Datasets/BLM/terradat_points_table.csv")
 ```
 
 
-# NutNet (Nutrient Network)
+# (I) NutNet (Nutrient Network)
 Anderson et al. (2018) model </br>
 
-Test effect of Herbivory (FENCE; yes/no) & Eutrophication (Fertilizer; yes/no) on C, N, P & K
+Tests effect of Herbivory (FENCE; yes/no) & Eutrophication (Fertilizer; yes/no) on C, N, P & K
 
 Model includes treatment variable Fence, as well as environmental measures of MAP, MAT and SOLAR.INS  
 MAP = mean annual precipitation  
@@ -71,6 +71,7 @@ plot_frequencyDist <- function(df, variable) {
 plot_frequencyDist(data_NutNet, "plant.N")
 plot_frequencyDist(data_NutNet, "plant.P")
 plot_frequencyDist(data_NutNet, "plant.K")
+plot_frequencyDist(data_NutNet, "TOTAL.AG.BIOMASS")
 ```
 
 ## Analysis
@@ -78,60 +79,6 @@ create `REPLICATE` variable for analysis
 ```{r}
 # create REPLICATE variable for analysis
 data_NutNet$REPLICATE <- paste0(data_NutNet$SITE, data_NutNet$TREATMENT)
-```
-
-
-
-
-### TEST
-```{r}
-ggplot(data  = data_NutNet,
-       aes(x = TREATMENT,
-           y = TOTAL.AG.BIOMASS,
-           colour = TREATMENT))+
-  geom_point(size = 1.2,
-             alpha = .8,
-             position = "jitter")+# to add some random noise for plotting purposes
-  theme_minimal() + theme(legend.position = "none")
-```
-
-```{r}
-get_variables(modelb_plant.NPK)
-```
-
-```{r}
-library(ggmcmc)
-
-model1transformed <- ggs(modelb_plant.NPK)
-ggplot(filter(model1transformed, Parameter %in% c("b_Intercept", "sigma", "r_SITE[burrawan.au,Intercept]")),
-       aes(x   = Iteration,
-           y   = value, 
-           col = as.factor(Chain)))+
-  geom_line() +
-  geom_vline(xintercept = 1000)+
-  facet_grid(Parameter ~ . ,
-             scale  = 'free_y',
-             switch = 'y')+
-  labs(title = "Caterpillar Plots", 
-       col   = "Chains")
-```
-
-```{r}
-modelb_plant.NPK %>%
-  spread_draws(b_Intercept, r_SITE[location,]) %>%
-  median_qi(location_mean = b_Intercept + r_SITE) %>%
-  ggplot(aes(y = location, x = location_mean, xmin = .lower, xmax = .upper)) +
-  geom_pointintervalh()
-```
-
-```{r}
-library(modelr)
-
-# data_NutNet %>%
-#   data_grid(SITE) %>%
-#   add_predicted_draws(modelb_plant.NPK) %>%
-#   ggplot(aes(x = .prediction, y = R_SITE)) +
-#   stat_slabh()
 ```
 
 
@@ -235,6 +182,11 @@ post_mat %>% data.frame %>% mutate(V_all = V_rep + V_site + V_res + V_fix,
                                    P_all = P_rep + P_site + P_res + P_fix)          ->  post_mat2_plant.N
 
 ```
+
+
+
+
+
 
 ### Plant P
 
@@ -396,44 +348,12 @@ post_mat %>% data.frame %>% mutate(V_all = V_rep + V_site + V_res + V_fix,
 
 ```
 
-```{r}
-# get all posterior samples
-post <- posterior_samples(modelb_plant.K)
-
-# we get what we need - for random effect
-V_rep <-post$sd_REPLICATE__Intercept^2 # making it variance
-V_site <-post$sd_SITE__Intercept^2
-V_res <- post$sigma^2 
-```
 
 
-```{r}
-# calculate variance for fixed effects
 
-# get a data frame of different posterior of fixed effects
-post_fix <- as.data.frame(t(post[,1:4]))
 
-# get a posterior of fixed effects
-V_fix <-  map_dbl(post_fix, ~ var(as.vector(. %*% t(model@pp$X))) )
 
-# mcmc object (from coda package)
-post_mat <- as.mcmc(data.frame(V_rep, V_site, V_res, V_fix, row.names = NULL))
-
-summary(post_mat)
-plot(post_mat)
-
-head(post_mat)
-
-post_mat %>% data.frame %>% mutate(V_all = V_rep + V_site + V_res + V_fix,
-                                   P_rep = V_rep/(V_rep + V_site + V_res + V_fix),
-                                   P_site = V_site/(V_rep + V_site + V_res + V_fix),
-                                   P_res = V_res/(V_rep + V_site + V_res + V_fix),
-                                   P_fix = V_fix/(V_rep + V_site + V_res + V_fix),
-                                   P_all = P_rep + P_site + P_res + P_fix)          ->  post_mat2_plant.K
-
-```
-
-### Total AG Biomass
+### Total Biomass
 
 Frequentist model
 ```{r}
@@ -474,11 +394,52 @@ modelb_total.ag.biomass <- readRDS("model_total.ag.biomass.rds")
 bayes_R2(modelb_total.ag.biomass)
 ```
 
+```{r}
+# get all posterior samples
+post <- posterior_samples(modelb_total.ag.biomass)
 
+# we get what we need - for random effects
+V_rep <-post$sd_REPLICATE__Intercept^2 # making it variance
+V_site <-post$sd_SITE__Intercept^2
+V_res <- post$sigma^2 
+```
+
+
+```{r}
+# calculate variance for fixed effects
+
+# get a data frame of different posterior of fixed effects
+post_fix <- as.data.frame(t(post[,1:4]))
+
+# get a posterior of fixed effects
+V_fix <-  map_dbl(post_fix, ~ var(as.vector(. %*% t(model@pp$X))) )
+
+# mcmc object (from coda package)
+post_mat <- as.mcmc(data.frame(V_rep, V_site, V_res, V_fix, row.names = NULL))
+
+summary(post_mat)
+plot(post_mat)
+
+head(post_mat)
+
+post_mat %>% data.frame %>% 
+  mutate(V_all = V_rep + V_site + V_res + V_fix,
+          P_rep = V_rep/(V_rep + V_site + V_res + V_fix),
+          P_site = V_site/(V_rep + V_site + V_res + V_fix),
+          P_res = V_res/(V_rep + V_site + V_res + V_fix),
+          P_fix = V_fix/(V_rep + V_site + V_res + V_fix),
+          P_all = P_rep + P_site + P_res + P_fix)          ->  post_mat2_total.ag.biomass
+
+```
+
+
+
+
+<br>
 
 ***
 
-
+<br>
 
 ## PLOTS
 
@@ -513,7 +474,6 @@ create_VarTable <- function(repOutput, VariableName, BioHetVariable) {
 
 ```{r}
 # Pull values for each variable and variance estimate
-varTable_plant.NPK <- create_VarTable(rep_plant.NPK, "plant.NPK", "SITE")
 varTable_plant.N <- create_VarTable(rep_plant.N, "plant.N", "SITE")
 varTable_plant.P <- create_VarTable(rep_plant.P, "plant.P", "SITE")
 varTable_plant.K <- create_VarTable(rep_plant.K, "plant.K", "SITE")
@@ -548,8 +508,10 @@ varTable_NutNet %>%
 
 
 ### Bayes model
+
+Create data frame for plotting
 ```{r}
-# Function to create data frames
+# Function to create data frames from posterior estimates
 create_bayesVarTable <- function(posteriorVarianceDF, variableName) {
   # make variable name usable for character
   varName <- as.character(variableName)
@@ -564,14 +526,16 @@ create_bayesVarTable <- function(posteriorVarianceDF, variableName) {
   pivot_longer(c(-Variable, -iteration), values_to = "Variance") # flip the table
 }
 
-propPost_plant.NPK <- create_bayesVarTable(post_mat2_plant.NPK, "plant.NPK")
+# Create smaller data frames of variance proportions
 propPost_plant.N <- create_bayesVarTable(post_mat2_plant.N, "plant.N")
 propPost_plant.P <- create_bayesVarTable(post_mat2_plant.P, "plant.P")
 propPost_plant.K <- create_bayesVarTable(post_mat2_plant.K, "plant.K")
+propPost_total.ag.biomass <- create_bayesVarTable(post_mat2_total.ag.biomass, "total.ag.biomass")
 
 
-# Combine
-propPost <- as.data.frame(rbind(propPost_plant.N, propPost_plant.P, propPost_plant.K))
+# Combine to make one data frame for plotting
+propPost <- as.data.frame(rbind(propPost_plant.N, propPost_plant.P, 
+                                propPost_plant.K, propPost_total.ag.biomass))
 ```
 
 
@@ -587,49 +551,99 @@ propPost_NutNet <- as.data.frame(cbind(mean_P_rep, mean_P_site, mean_P_res, mean
 
 
 ```{r, eval = FALSE, echo = FALSE}
-# Summarised SE & mean values
-propPost.sem <- propPost %>% 
-  group_by(Variable, name) %>% 
-  summarise(mean = mean(Variance),
-            sem = sd(Variance) / sqrt(n()),
-            lower = (mean - sem),
-            upper = (mean + sem))
-str(propPost.sem)
-```
-
-
-```{r}
-# Dax to make figure
-library(ggthemes)
-
-propPost %>%
+# Rename variables for plotting
+propPost <- propPost %>%
     mutate(
     name = as.factor(recode(name,
                         "P_fix" = "Fixed",
                         "P_rep" = "Replicate",
                         "P_res" = "Residual",
-                        "P_site" = "Location"))
-  ) %>%
-  ggplot(aes(x = name, y = Variance, fill = name, colour = name)) + 
-  facet_grid(~Variable) +
-  stat_summary(fun.y = mean, geom = "bar", position = "dodge",width = 1, alpha = .8) +
-  stat_summary(fun.data = mean_cl_normal, geom = "errorbar", 
-               width = 0.15, position = position_dodge(width = 0.90), colour = "black") +
-  # geom_bar(stat = "identity", position = "stack", width = 0.2, alpha = .6, size = 1) +
-  # geom_errorbar(aes(ymin = lower, 
-  #                   ymax = upper),
-  #               stat = "identity",
-  #               width=.1,                    # Width of the error bars
-  #               position="identity", colour = "black") + 
+                        "P_site" = "Location")),
+    Variable = as.factor(recode(Variable,
+                                "total.ag.biomass" = "Biomass",
+                                "plant.N" = "N (%)",
+                                "plant.K" = "K (%)",
+                                "plant.P" = "P (%)"))
+  )
+
+# calculate mean & SE values
+propPost.sem <-
+  propPost %>% 
+  dplyr::group_by(name, Variable) %>%
+  summarise(mean = mean(Variance),
+            sem = sd(Variance) / sqrt(length(Variance)),
+            upper = mean+sem,
+            lower = mean-sem)
+
+# rearrange order of variables
+propPost.sem <- propPost.sem %>%
+     arrange_at(4, desc) %>%
+     arrange(match(name, c("Location", "Residual", "Replicate", "Fixed")))
+
+propPost.sem
+
+# Convert SE values to cumulative sums for plotting purposes
+propPost.sem2 <- within(propPost.sem,mean2 <- ave(mean,Variable, FUN=cumsum))
+
+propPost.sem2 %>% filter(Variable == "N (%)")
+
+
+
+```
+
+
+
+Stacked Bar Plot
+```{r}
+library(ggthemes)
+
+plot <- 
+  propPost.sem2 %>% mutate(
+    Component = name) %>%
+  ggplot(aes(x = Variable, 
+             y = mean, 
+             fill = Component, colour = Component)) + 
+  geom_bar(stat = "identity", width = .4, alpha = .8) +
   coord_cartesian(ylim = c(0, 1)) + 
-  scale_y_continuous(labels = scales::percent) +
-  labs(x = "Variance Components",
+  scale_y_continuous(labels = scales::percent) + 
+  coord_flip() +
+  labs(x = "Outcome Variables",
        y = "Proportion of Total Variance") +
   scale_fill_ptol() + scale_colour_ptol() + 
   theme_minimal() + 
-  theme(legend.position = "none")
+  theme(legend.position = "top")
+```
 
 
+
+Side-by-side bar plots of individual variance components
+```{r}
+plot2 <- propPost %>% 
+  ggplot(aes(x = Variable, y = Variance, fill = name, colour = name)) + 
+  facet_grid(rows = vars(name)) +
+  stat_summary(fun.y = mean, geom = "bar", position = "dodge",width = 1, alpha = .8) +
+  stat_summary(fun.data = mean_cl_normal, geom = "errorbar", 
+               width = 0.15, position = position_dodge(width = 0.90), colour = "black") +
+  scale_y_continuous(labels = scales::percent) +
+  labs(x = "Outcome Variables",
+       y = "Proportion of Total Variance") +
+  scale_fill_ptol() + scale_colour_ptol() + coord_flip(ylim = c(0,1)) +
+  theme_minimal() + 
+  theme(legend.position = "none",
+        strip.text.y = element_text(angle = 0))
+        # axis.text.x = element_text(angle = -90, hjust = 0)) 
+```
+
+*Variance Components Plots (Bayes)*
+```{r}
+library(patchwork)
+
+plot + plot2 + plot_layout(widths = c(2, 1))
+```
+
+
+
+```{r}
 # Dax - go to here (not all exp and code are useful)
 # https://github.com/paul-buerkner/brms
 # https://mjskay.github.io/tidybayes/articles/tidy-brms.html
@@ -648,7 +662,59 @@ posterior.mode(V_rep) # posterior mode because variation is not normally distrib
 
 
 
-# Controlled Systematic Variability (CSV)
+
+## DATA OBSERVATION
+```{r}
+ggplot(data  = data_NutNet,
+       aes(x = TREATMENT,
+           y = TOTAL.AG.BIOMASS,
+           colour = TREATMENT))+
+  geom_point(size = 1.2,
+             alpha = .8,
+             position = "jitter")+# to add some random noise for plotting purposes
+  theme_minimal() + theme(legend.position = "none")
+```
+
+```{r}
+get_variables(modelb_plant.N)
+```
+
+```{r}
+library(ggmcmc)
+
+model1transformed <- ggs(modelb_plant.N)
+ggplot(filter(model1transformed, Parameter %in% c("b_Intercept", "sigma", "r_SITE[burrawan.au,Intercept]")),
+       aes(x   = Iteration,
+           y   = value, 
+           col = as.factor(Chain)))+
+  geom_line() +
+  geom_vline(xintercept = 1000)+
+  facet_grid(Parameter ~ . ,
+             scale  = 'free_y',
+             switch = 'y')+
+  labs(title = "Caterpillar Plots", 
+       col   = "Chains")
+```
+
+```{r}
+modelb_plant.NPK %>%
+  spread_draws(b_Intercept, r_SITE[location,]) %>%
+  median_qi(location_mean = b_Intercept + r_SITE) %>%
+  ggplot(aes(y = location, x = location_mean, xmin = .lower, xmax = .upper)) +
+  geom_pointintervalh()
+```
+
+```{r}
+library(modelr)
+
+# data_NutNet %>%
+#   data_grid(SITE) %>%
+#   add_predicted_draws(modelb_plant.NPK) %>%
+#   ggplot(aes(x = .prediction, y = R_SITE)) +
+#   stat_slabh()
+```
+
+# (II) CSV (Controlled Systematic Variability)
 Microcosms experiment  
 Milcu et al. (2018)  
 Sites: 14 European Labs  
@@ -820,7 +886,7 @@ varTable_CSV %>%
 
 
 
-# BLM Data
+# (III) BLM Data
 Bureau of Land Management data
 
 ```{r}
