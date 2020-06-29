@@ -772,7 +772,7 @@ data_CSV <- rename(data_CSV,
                    biomass_Shoot = Biom.dm..g...shoot.,
                    biomass_Root = Biom.dm..g...root.,
                    biomass_Total = Biom.dm..g...total.,
-                   height_B.dist = B..distachyon.height..cm.,
+                   height_legume = B..distachyon.height..cm.,
                    ratio_RootShoot = Root.shoot,
                    N.shoot = N.shoot....,
                    C.shoot = C.shoot....,
@@ -797,19 +797,21 @@ create `Replicate` variable for analysis by separating by Block (replicate) and 
 ```{r}
 data_CSV$Replicate <-  paste0(data_CSV$Block, data_CSV$Lab) # add replicate variable
 ```
-Frequency distribution of data
+
+
+Frequency distributions of variables
 ```{r}
 plot_frequencyDist(data_CSV, "biomass_Seed")
 plot_frequencyDist(data_CSV, "biomass_Seed")
 ```
 
-### Shoot Biomass
+### Seed Biomass
 
 Frequentist model
 ```{r}
-# Shoot biomass
+# Seed biomass (of B. distachyon)
 model <- lmer(biomass_Seed ~ Legume*Method.comm + 
-                (1|Lab) + (1|CSV) + (1| Replicate), 
+                (1|Lab) + (1|CSV) + (1|Replicate), 
                 data = data_CSV)
                 
 summary(model)
@@ -819,19 +821,63 @@ hist(resid(model)) # Note that there is an outlier
 var(data_CSV$biomass_Seed)
 ```
 
-
-### Seed Biomass
+Bayesian model
 ```{r}
-rep_biomass_Seed <- rptGaussian(biomass_Seed ~ Legume*Method.comm + (1|Lab) + (1|CSV) + (1| Replicate),
-                    grname = c("Lab", "CSV", "Replicate", "Fixed", "Residual"), 
-                    data = data_CSV,
-                    ratio = FALSE,
-                    nboot = 100, parallel = TRUE, adjusted = FALSE)
+# Seed Biomass
+modelb_biomass_Seed<- brm(biomass_Seed ~ Legume*Method.comm + 
+                            (1|Lab) + (1|CSV) + (1|Replicate), 
+                          data = data_CSV,
+                          chains = 2, cores = 2)
 
-rep_biomass_Seed
+# Save model
+saveRDS(modelb_biomass_Seed, "model_biomass_Seed.rds")
 ```
 
+```{r}
+# Load model
+modelb_biomass_Seed <- readRDS("model_biomass_Seed.rds")
+
+# bayesian R2 estimate of regression model
+bayes_R2(modelb_biomass_Seed)
+```
+
+
 ### Shoot Biomass
+
+Frequentist model
+```{r}
+# Seed biomass (of B. distachyon)
+model <- lmer(biomass_Shoot ~ Legume*Method.comm + 
+                (1|Lab) + (1|CSV) + (1|Replicate), 
+                data = data_CSV)
+                
+summary(model)
+hist(resid(model)) # Note that there is an outlier
+
+# Total Variance
+var(data_CSV$biomass_Shoot)
+```
+
+Bayesian model
+```{r}
+# Seed Biomass
+modelb_biomass_Shoot<- brm(biomass_Shoot ~ Legume*Method.comm + 
+                            (1|Lab) + (1|CSV) + (1|Replicate), 
+                          data = data_CSV,
+                          chains = 2, cores = 2)
+
+# Save model
+saveRDS(modelb_biomass_Shoot, "model_biomass_Shoot.rds")
+```
+
+```{r}
+# Load model
+modelb_biomass_Shoot <- readRDS("model_biomass_Shoot.rds")
+
+# bayesian R2 estimate of regression model
+bayes_R2(modelb_biomass_Shoot)
+```
+
 ```{r}
 rep_biomass_Shoot <- rptGaussian(biomass_Shoot ~ Legume*Method.comm + (1|Lab) + (1|CSV) + (1| Replicate),
                     grname = c("Lab", "CSV", "Replicate", "Fixed", "Residual"), 
@@ -841,7 +887,43 @@ rep_biomass_Shoot <- rptGaussian(biomass_Shoot ~ Legume*Method.comm + (1|Lab) + 
 rep_biomass_Shoot
 ```
 
+
 ### Root Biomass
+
+Frequentist model
+```{r}
+# Seed biomass (of B. distachyon)
+model <- lmer(biomass_Seed ~ Legume*Method.comm + 
+                (1|Lab) + (1|CSV) + (1|Replicate), 
+                data = data_CSV)
+                
+summary(model)
+hist(resid(model)) # Note that there is an outlier
+
+# Total Variance
+var(data_CSV$biomass_Seed)
+```
+
+Bayesian model
+```{r}
+# Seed Biomass
+modelb_biomass.Seed<- brm(biomass_Seed ~ Legume*Method.comm + 
+                            (1|Lab) + (1|CSV) + (1|Replicate), 
+                          data = data_CSV,
+                          chains = 2, cores = 2)
+
+# Save model
+saveRDS(modelb_biomass.Seed, "model_biomassSeed.rds")
+```
+
+```{r}
+# Load model
+modelb_biomass.Seed <- readRDS("model_biomassSeed.rds")
+
+# bayesian R2 estimate of regression model
+bayes_R2(modelb_biomass.Seed)
+```
+
 ```{r}
 rep_biomass_Root <- rptGaussian(biomass_Root ~ Legume*Method.comm + (1|Lab) + (1|CSV) + (1| Replicate),
                     grname = c("Lab", "CSV", "Replicate", "Fixed", "Residual"), 
@@ -851,17 +933,43 @@ rep_biomass_Root <- rptGaussian(biomass_Root ~ Legume*Method.comm + (1|Lab) + (1
 rep_biomass_Root
 ```
 
-### Total Biomass
+
+### Legume Height
+
+Frequentist model
 ```{r}
-rep_biomass_Total <- rptGaussian(biomass_Total ~ Legume*Method.comm + (1|Lab) + (1|CSV) + (1| Replicate),
-                    grname = c("Lab", "CSV", "Replicate", "Fixed", "Residual"), 
-                    data = data_CSV,
-                    ratio = FALSE,
-                    nboot = 100, parallel = TRUE, adjusted = FALSE)
-rep_biomass_Total
+# Seed biomass (of B. distachyon)
+model <- lmer(biomass_Seed ~ Legume*Method.comm + 
+                (1|Lab) + (1|CSV) + (1|Replicate), 
+                data = data_CSV)
+                
+summary(model)
+hist(resid(model)) # Note that there is an outlier
+
+# Total Variance
+var(data_CSV$biomass_Seed)
 ```
 
-### Root:Shoot Ratio
+Bayesian model
+```{r}
+# Seed Biomass
+modelb_biomass.Seed<- brm(biomass_Seed ~ Legume*Method.comm + 
+                            (1|Lab) + (1|CSV) + (1|Replicate), 
+                          data = data_CSV,
+                          chains = 2, cores = 2)
+
+# Save model
+saveRDS(modelb_biomass.Seed, "model_biomassSeed.rds")
+```
+
+```{r}
+# Load model
+modelb_biomass.Seed <- readRDS("model_biomassSeed.rds")
+
+# bayesian R2 estimate of regression model
+bayes_R2(modelb_biomass.Seed)
+```
+
 ```{r}
 rep_ratio_RootShoot <- rptGaussian(ratio_RootShoot ~ Legume*Method.comm + 
                                      (1|Lab) + (1|CSV) + (1| Replicate),
@@ -873,6 +981,41 @@ rep_ratio_RootShoot
 ```
 
 ### N Shoot
+
+Frequentist model
+```{r}
+# Seed biomass (of B. distachyon)
+model <- lmer(biomass_Seed ~ Legume*Method.comm + 
+                (1|Lab) + (1|CSV) + (1|Replicate), 
+                data = data_CSV)
+                
+summary(model)
+hist(resid(model)) # Note that there is an outlier
+
+# Total Variance
+var(data_CSV$biomass_Seed)
+```
+
+Bayesian model
+```{r}
+# Seed Biomass
+modelb_biomass.Seed<- brm(biomass_Seed ~ Legume*Method.comm + 
+                            (1|Lab) + (1|CSV) + (1|Replicate), 
+                          data = data_CSV,
+                          chains = 2, cores = 2)
+
+# Save model
+saveRDS(modelb_biomass.Seed, "model_biomassSeed.rds")
+```
+
+```{r}
+# Load model
+modelb_biomass.Seed <- readRDS("model_biomassSeed.rds")
+
+# bayesian R2 estimate of regression model
+bayes_R2(modelb_biomass.Seed)
+```
+
 ```{r}
 rep_N.shoot <- rptGaussian(N.shoot ~ Legume*Method.comm + (1|Lab) + (1|CSV) + (1| Replicate),
                     grname = c("Lab", "CSV", "Replicate", "Fixed", "Residual"), 
@@ -883,6 +1026,41 @@ rep_N.shoot
 ```
 
 ### C Shoot
+
+Frequentist model
+```{r}
+# Seed biomass (of B. distachyon)
+model <- lmer(biomass_Seed ~ Legume*Method.comm + 
+                (1|Lab) + (1|CSV) + (1|Replicate), 
+                data = data_CSV)
+                
+summary(model)
+hist(resid(model)) # Note that there is an outlier
+
+# Total Variance
+var(data_CSV$biomass_Seed)
+```
+
+Bayesian model
+```{r}
+# Seed Biomass
+modelb_biomass.Seed<- brm(biomass_Seed ~ Legume*Method.comm + 
+                            (1|Lab) + (1|CSV) + (1|Replicate), 
+                          data = data_CSV,
+                          chains = 2, cores = 2)
+
+# Save model
+saveRDS(modelb_biomass.Seed, "model_biomassSeed.rds")
+```
+
+```{r}
+# Load model
+modelb_biomass.Seed <- readRDS("model_biomassSeed.rds")
+
+# bayesian R2 estimate of regression model
+bayes_R2(modelb_biomass.Seed)
+```
+
 ```{r}
 rep_C.shoot <- rptGaussian(C.shoot ~ Legume*Method.comm + (1|Lab) + (1|CSV) + (1| Replicate),
                     grname = c("Lab", "CSV", "Replicate", "Fixed", "Residual"), 
@@ -892,7 +1070,89 @@ rep_C.shoot <- rptGaussian(C.shoot ~ Legume*Method.comm + (1|Lab) + (1|CSV) + (1
 rep_C.shoot
 ```
 
-## Data Viz - Variance Components
+
+### Substrate EvapoTranspiration
+
+Frequentist model
+```{r}
+# Seed biomass (of B. distachyon)
+model <- lmer(biomass_Seed ~ Legume*Method.comm + 
+                (1|Lab) + (1|CSV) + (1|Replicate), 
+                data = data_CSV)
+                
+summary(model)
+hist(resid(model)) # Note that there is an outlier
+
+# Total Variance
+var(data_CSV$biomass_Seed)
+```
+
+Bayesian model
+```{r}
+# Seed Biomass
+modelb_biomass.Seed<- brm(biomass_Seed ~ Legume*Method.comm + 
+                            (1|Lab) + (1|CSV) + (1|Replicate), 
+                          data = data_CSV,
+                          chains = 2, cores = 2)
+
+# Save model
+saveRDS(modelb_biomass.Seed, "model_biomassSeed.rds")
+```
+
+```{r}
+# Load model
+modelb_biomass.Seed <- readRDS("model_biomassSeed.rds")
+
+# bayesian R2 estimate of regression model
+bayes_R2(modelb_biomass.Seed)
+```
+
+### Litter Decomposition
+
+Frequentist model
+```{r}
+# Seed biomass (of B. distachyon)
+model <- lmer(biomass_Seed ~ Legume*Method.comm + 
+                (1|Lab) + (1|CSV) + (1|Replicate), 
+                data = data_CSV)
+                
+summary(model)
+hist(resid(model)) # Note that there is an outlier
+
+# Total Variance
+var(data_CSV$biomass_Seed)
+```
+
+Bayesian model
+```{r}
+# Seed Biomass
+modelb_biomass.Seed<- brm(biomass_Seed ~ Legume*Method.comm + 
+                            (1|Lab) + (1|CSV) + (1|Replicate), 
+                          data = data_CSV,
+                          chains = 2, cores = 2)
+
+# Save model
+saveRDS(modelb_biomass.Seed, "model_biomassSeed.rds")
+```
+
+```{r}
+# Load model
+modelb_biomass.Seed <- readRDS("model_biomassSeed.rds")
+
+# bayesian R2 estimate of regression model
+bayes_R2(modelb_biomass.Seed)
+```
+
+
+<br>
+
+***
+
+<br>
+
+## PLOTS
+
+###rptR
 
 Pull variance values from rptR output & Create table with variance components
 ```{r}
@@ -933,8 +1193,6 @@ varTable_CSV %>%
           legend.position = "top")
 
 ```
-
-
 
 
 
@@ -1521,10 +1779,10 @@ hist(resid(model)) # Looks great
 
 Bayesian model
 ```{r, eval = FALSE}
-# modelb_total_foliar_cover <- brm(z_soil_stab ~ z_total_foliar_cover +
-#                           (1 + z_total_foliar_cover|ProjectName) + (1 | Replicate),
-#                         data = sdata_BLM,
-#                         chains = 2, cores = 2) # you can do more but 2 chains will be fine
+modelb_total_foliar_cover <- brm(z_soil_stab ~ z_total_foliar_cover +
+                          (1 + z_total_foliar_cover|ProjectName) + (1 | Replicate),
+                        data = sdata_BLM,
+                        chains = 2, cores = 2) # you can do more but 2 chains will be fine
 
 # Save models
 # saveRDS(modelb_total_foliar_cover, "modelb_total_foliar_cover.rds")
@@ -1543,7 +1801,7 @@ post <- posterior_samples(modelb_total_foliar_cover)
 
 # we get what we need - for random effect
 V_rep <-post$sd_Replicate__Intercept^2 # making it variance
-V_site <-post$sd_ProjectName__Intercept^2 + post$sd_ProjectName__z_total_foliar_cover
+V_site <-post$sd_ProjectName__Intercept^2 + post$sd_ProjectName__z_total_foliar_cover^2
 V_res <- post$sigma^2 
 ```
 
