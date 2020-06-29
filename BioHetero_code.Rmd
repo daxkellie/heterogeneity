@@ -796,12 +796,6 @@ data_CSV %>% head(10)
 create `Replicate` variable for analysis by separating by Block (replicate) and Lab
 ```{r}
 data_CSV$Replicate <-  paste0(data_CSV$Block, data_CSV$Lab) # add replicate variable
-
-model <- lmer(biomass_Seed ~ Legume*Method.comm + (1|Lab) + (1|CSV)+
-                (1| Replicate), 
-                data = data_CSV)
-                
-summary(model)                
 ```
 Frequency distribution of data
 ```{r}
@@ -814,16 +808,15 @@ plot_frequencyDist(data_CSV, "biomass_Seed")
 Frequentist model
 ```{r}
 # Shoot biomass
-model <- lmer(biomass_Seed ~ Legume*Method.comm + (1|Lab) + (1|CSV)+
-                (1| Replicate), 
+model <- lmer(biomass_Seed ~ Legume*Method.comm + 
+                (1|Lab) + (1|CSV) + (1| Replicate), 
                 data = data_CSV)
                 
-summary(model)
 summary(model)
 hist(resid(model)) # Note that there is an outlier
 
 # Total Variance
-var(data_NutNet$plant.N)
+var(data_CSV$biomass_Seed)
 ```
 
 
