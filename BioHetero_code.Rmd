@@ -541,10 +541,22 @@ propPost <- as.data.frame(rbind(propPost_plant.N, propPost_plant.P,
 
 ```{r}
 # finding average proportions of all variables
-mean_P_rep <- ((post_mat2_plant.N$P_rep + post_mat2_plant.P$P_rep + post_mat2_plant.K$P_rep)/3)
-mean_P_site <- ((post_mat2_plant.N$P_site + post_mat2_plant.P$P_site + post_mat2_plant.K$P_site)/3)
-mean_P_res <- ((post_mat2_plant.N$P_res + post_mat2_plant.P$P_res + post_mat2_plant.K$P_res)/3)
-mean_P_fix <- ((post_mat2_plant.N$P_fix + post_mat2_plant.P$P_fix + post_mat2_plant.K$P_fix)/3)
+mean_P_rep <- ((post_mat2_plant.N$P_rep + 
+                  post_mat2_plant.P$P_rep + 
+                  post_mat2_plant.K$P_rep + 
+                  post_mat2_total.ag.biomass$P_rep) / 4)
+mean_P_site <- ((post_mat2_plant.N$P_site + 
+                   post_mat2_plant.P$P_site + 
+                   post_mat2_plant.K$P_site + 
+                   post_mat2_total.ag.biomass$P_site) / 4)
+mean_P_res <- ((post_mat2_plant.N$P_res + 
+                  post_mat2_plant.P$P_res + 
+                  post_mat2_plant.K$P_res + 
+                  post_mat2_total.ag.biomass$P_res) / 4)
+mean_P_fix <- ((post_mat2_plant.N$P_fix + 
+                  post_mat2_plant.P$P_fix + 
+                  post_mat2_plant.K$P_fix + 
+                  post_mat2_total.ag.biomass$P_fix) / 4)
 
 propPost_NutNet <- as.data.frame(cbind(mean_P_rep, mean_P_site, mean_P_res, mean_P_fix))
 ```
@@ -564,7 +576,9 @@ propPost <- propPost %>%
                                 "plant.N" = "N (%)",
                                 "plant.K" = "K (%)",
                                 "plant.P" = "P (%)"))
-  )
+  ) %>%
+       arrange_at(4, desc) %>%
+     arrange(match(name, c("Location", "Residual", "Replicate", "Fixed")))
 
 # calculate mean & SE values
 propPost.sem <-
@@ -599,7 +613,8 @@ library(ggthemes)
 
 plot <- 
   propPost.sem2 %>% mutate(
-    Component = name) %>%
+    Component = factor(name, levels=c("Fixed", "Replicate", "Residual", "Location"))) %>% 
+  
   ggplot(aes(x = Variable, 
              y = mean, 
              fill = Component, colour = Component)) + 
@@ -618,7 +633,9 @@ plot <-
 
 Side-by-side bar plots of individual variance components
 ```{r}
-plot2 <- propPost %>% 
+plot2 <- propPost %>% mutate(
+  name = factor(name, levels=c("Fixed", "Replicate", "Residual", "Location"))) %>% 
+  
   ggplot(aes(x = Variable, y = Variance, fill = name, colour = name)) + 
   facet_grid(rows = vars(name)) +
   stat_summary(fun.y = mean, geom = "bar", position = "dodge",width = 1, alpha = .8) +
@@ -641,7 +658,15 @@ library(patchwork)
 plot + plot2 + plot_layout(widths = c(2, 1))
 ```
 
+<br>
 
+***
+
+<br>
+
+
+
+## Data Exploration
 
 ```{r}
 # Dax - go to here (not all exp and code are useful)
@@ -660,10 +685,6 @@ posterior.mode(V_rep) # posterior mode because variation is not normally distrib
 ```
 
 
-
-
-
-## DATA OBSERVATION
 ```{r}
 ggplot(data  = data_NutNet,
        aes(x = TREATMENT,
@@ -719,9 +740,28 @@ Microcosms experiment
 Milcu et al. (2018)  
 Sites: 14 European Labs  
 
-<br/>
+<br>
 
-Tested effect of presence of legume species on grass species. Introducted genetic and environmental variability.  <br/>
+Tested effect of presence of legume species on grass species. Introducted genetic and environmental variability by deliberately introducing unnacounted variability into lab-based designs. They did this by running replicates in growth chambers (highly controlled environments) and glasshouses (more variable environments). They also spatially varied soil resource distribution by introducing 6 sandpatches, varied the number of sand patches (0, 3, 6) among microcosms, used 3 distinct genotypes of legumes, and varied the number of genotypes (1, 2, 3) among microcosms.  
+
+<br>
+
+Variables:  
+`Legume``: Presence of legume species
+`CSV`: Type of controlled systematic variability (CTR, ENVw, ENVb, GENw, GENb)  
+`biomass_Shoot`: Shoot biomass of grass species
+`biomass_Root`: Root biomass of grass species
+`biomass_Total`: Total biomass of grass species
+`ratio_RootShoot`: Root to Shoot ratio of grass species
+
+`biomass_Seed`: Seed biomass of B. distachyon (legume)
+`height_B.dist`: Height of B. distachyon (legume)
+`N.shoot`: % N in B.distachyon
+`C.shoot`: % C in B.distachyon
+`delta15.N``: $\delta$^15^ N in B. distachyon
+`delta13.C`: $\delta$^13^ C in B. distachyon
+`substrate_ET`: Evapotranspiration of a common substrate using a simplified version of the tea bag litter decomposition method
+`litter`: Mass of litter (in g)
 
 Rename columns
 ```{r}
@@ -732,12 +772,17 @@ data_CSV <- rename(data_CSV,
                    biomass_Shoot = Biom.dm..g...shoot.,
                    biomass_Root = Biom.dm..g...root.,
                    biomass_Total = Biom.dm..g...total.,
+                   height_B.dist = B..distachyon.height..cm.,
                    ratio_RootShoot = Root.shoot,
                    N.shoot = N.shoot....,
-                   C.shoot = C.shoot....
+                   C.shoot = C.shoot....,
+                   delta15.N = "Î.15N..â...air.",
+                   delta13.C = "Î.13C..â...PDB.",
+                   substrate_ET = ET..ml.day.,
+                   litter = Litter..g.
                    )
 
-# They removed outliers but I'll keep these in.
+# Authors removed outliers but we'll keep these in.
 ```
 
 ```{r}
@@ -746,9 +791,9 @@ data_CSV %>% head(10)
 ```
 
 
-## Repeatability Analysis
+## Analysis
 
-Shinichi's model
+create `Replicate` variable for analysis by separating by Block (replicate) and Lab
 ```{r}
 data_CSV$Replicate <-  paste0(data_CSV$Block, data_CSV$Lab) # add replicate variable
 
@@ -764,8 +809,23 @@ plot_frequencyDist(data_CSV, "biomass_Seed")
 plot_frequencyDist(data_CSV, "biomass_Seed")
 ```
 
-## rptR Repeatability Analysis
-_Use the buttons to navigate_
+### Shoot Biomass
+
+Frequentist model
+```{r}
+# Shoot biomass
+model <- lmer(biomass_Seed ~ Legume*Method.comm + (1|Lab) + (1|CSV)+
+                (1| Replicate), 
+                data = data_CSV)
+                
+summary(model)
+summary(model)
+hist(resid(model)) # Note that there is an outlier
+
+# Total Variance
+var(data_NutNet$plant.N)
+```
+
 
 ### Seed Biomass
 ```{r}
