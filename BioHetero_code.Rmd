@@ -562,7 +562,7 @@ propPost_NutNet <- as.data.frame(cbind(mean_P_rep, mean_P_site, mean_P_res, mean
 ```
 
 
-```{r, eval = FALSE, echo = FALSE}
+```{r}
 # Rename variables for plotting
 propPost <- propPost %>%
     mutate(
@@ -833,6 +833,17 @@ hist(resid(model)) # Note that there is an outlier
 var(data_CSV$biomass_Seed)
 ```
 
+Variance Estimation (using rptR)
+```{r}
+rep_biomass_Seed <- rptGaussian(biomass_Seed ~ Legume*Method.comm + (1|Lab) + (1|CSV) + (1| Replicate),
+                    grname = c("Lab", "CSV", "Replicate", "Fixed", "Residual"), 
+                    data = data_CSV,
+                    ratio = FALSE,
+                    nboot = 100, parallel = FALSE, adjusted = FALSE)
+rep_biomass_Seed
+```
+
+
 Bayesian model
 ```{r, eval = FALSE}
 # Seed Biomass (of B.distachyon)
@@ -872,6 +883,16 @@ hist(resid(model)) # Note that there is an outlier
 var(data_CSV$biomass_Shoot)
 ```
 
+Variance Estimation (using rptR)
+```{r}
+rep_biomass_Shoot <- rptGaussian(biomass_Shoot ~ Legume*Method.comm + (1|Lab) + (1|CSV) + (1| Replicate),
+                    grname = c("Lab", "CSV", "Replicate", "Fixed", "Residual"), 
+                    data = data_CSV,
+                    ratio = FALSE,
+                    nboot = 100, parallel = FALSE, adjusted = FALSE)
+rep_biomass_Shoot
+```
+
 Bayesian model
 ```{r, eval = FALSE}
 # Shoot Biomass
@@ -892,15 +913,6 @@ modelb_biomass_Shoot <- readRDS("model_biomass_Shoot.rds")
 bayes_R2(modelb_biomass_Shoot)
 ```
 
-rptR
-```{r}
-rep_biomass_Shoot <- rptGaussian(biomass_Shoot ~ Legume*Method.comm + (1|Lab) + (1|CSV) + (1| Replicate),
-                    grname = c("Lab", "CSV", "Replicate", "Fixed", "Residual"), 
-                    data = data_CSV,
-                    ratio = FALSE,
-                    nboot = 10, parallel = FALSE, adjusted = FALSE)
-rep_biomass_Shoot
-```
 
 
 ### Root Biomass
@@ -917,6 +929,16 @@ hist(resid(model)) # Note that there is an outlier
 
 # Total Variance
 var(data_CSV$biomass_Root)
+```
+
+Variance Estimation (using rptR)
+```{r}
+rep_biomass_Root <- rptGaussian(biomass_Root ~ Legume*Method.comm + (1|Lab) + (1|CSV) + (1| Replicate),
+                    grname = c("Lab", "CSV", "Replicate", "Fixed", "Residual"), 
+                    data = data_CSV,
+                    ratio = FALSE,
+                    nboot = 100, parallel = TRUE, adjusted = FALSE)
+rep_biomass_Root
 ```
 
 Bayesian model
@@ -939,15 +961,7 @@ modelb_biomass_Root <- readRDS("model_biomass_Root.rds")
 bayes_R2(modelb_biomass_Root)
 ```
 
-rptR
-```{r}
-rep_biomass_Root <- rptGaussian(biomass_Root ~ Legume*Method.comm + (1|Lab) + (1|CSV) + (1| Replicate),
-                    grname = c("Lab", "CSV", "Replicate", "Fixed", "Residual"), 
-                    data = data_CSV,
-                    ratio = FALSE,
-                    nboot = 100, parallel = TRUE, adjusted = FALSE)
-rep_biomass_Root
-```
+
 
 
 ### Legume Height
@@ -964,6 +978,16 @@ hist(resid(model)) # Note that there is an outlier
 
 # Total Variance
 var(data_CSV$height_legume)
+```
+
+Variance Estimation (using rptR)
+```{r}
+rep_height_legume <- rptGaussian(height_legume ~ Legume*Method.comm + (1|Lab) + (1|CSV) + (1| Replicate),
+                    grname = c("Lab", "CSV", "Replicate", "Fixed", "Residual"), 
+                    data = data_CSV,
+                    ratio = FALSE,
+                    nboot = 100, parallel = TRUE, adjusted = FALSE)
+rep_height_legume
 ```
 
 Bayesian model
@@ -986,16 +1010,7 @@ modelb_height_legume <- readRDS("model_height_legume.rds")
 bayes_R2(modelb_height_legume)
 ```
 
-rptR
-```{r}
-rep_height_legume <- rptGaussian(height_legume ~ Legume*Method.comm + 
-                                     (1|Lab) + (1|CSV) + (1| Replicate),
-                    grname = c("Lab", "CSV", "Replicate", "Fixed", "Residual"), 
-                    data = data_CSV,
-                    ratio = FALSE,
-                    nboot = 100, parallel = TRUE, adjusted = FALSE)
-rep_ratio_RootShoot
-```
+
 
 ### N Shoot
 
@@ -1011,6 +1026,16 @@ hist(resid(model))
 
 # Total Variance
 var(data_CSV$N.shoot)
+```
+
+Variance Estimation (using rptR)
+```{r}
+rep_N.shoot <- rptGaussian(N.shoot ~ Legume*Method.comm + (1|Lab) + (1|CSV) + (1| Replicate),
+                    grname = c("Lab", "CSV", "Replicate", "Fixed", "Residual"), 
+                    data = data_CSV,
+                    ratio = FALSE,
+                    nboot = 100, parallel = TRUE, adjusted = FALSE)
+rep_N.shoot
 ```
 
 Bayesian model
@@ -1033,14 +1058,9 @@ modelb_N.shoot <- readRDS("model_Nshoot.rds")
 bayes_R2(modelb_N.shoot)
 ```
 
-```{r}
-rep_N.shoot <- rptGaussian(N.shoot ~ Legume*Method.comm + (1|Lab) + (1|CSV) + (1| Replicate),
-                    grname = c("Lab", "CSV", "Replicate", "Fixed", "Residual"), 
-                    data = data_CSV,
-                    ratio = FALSE,
-                    nboot = 100, parallel = TRUE, adjusted = FALSE)
-rep_N.shoot
-```
+
+
+
 
 ### C Shoot
 
@@ -1057,6 +1077,17 @@ hist(resid(model)) # not normally distributed
 # Total Variance
 var(data_CSV$C.shoot)
 ```
+
+Variance Estimation (using rptR)
+```{r}
+rep_C.shoot <- rptGaussian(C.shoot ~ Legume*Method.comm + (1|Lab) + (1|CSV) + (1| Replicate),
+                    grname = c("Lab", "CSV", "Replicate", "Fixed", "Residual"), 
+                    data = data_CSV,
+                    ratio = FALSE,
+                    nboot = 100, parallel = TRUE, adjusted = FALSE)
+rep_C.shoot
+```
+
 
 Bayesian model
 ```{r, eval = FALSE}
@@ -1078,14 +1109,6 @@ modelb_C.shoot <- readRDS("model_Cshoot.rds")
 bayes_R2(modelb_C.shoot)
 ```
 
-```{r}
-rep_C.shoot <- rptGaussian(C.shoot ~ Legume*Method.comm + (1|Lab) + (1|CSV) + (1| Replicate),
-                    grname = c("Lab", "CSV", "Replicate", "Fixed", "Residual"), 
-                    data = data_CSV,
-                    ratio = FALSE,
-                    nboot = 100, parallel = TRUE, adjusted = FALSE)
-rep_C.shoot
-```
 
 
 ### Substrate Evapotranspiration
@@ -1103,6 +1126,17 @@ hist(resid(model)) # Note that there is an outlier
 # Total Variance
 var(data_CSV$substrate_ET)
 ```
+
+Variance Estimation (using rptR)
+```{r}
+rep_substrate_ET <- rptGaussian(substrate_ET ~ Legume*Method.comm + (1|Lab) + (1|CSV) + (1| Replicate),
+                    grname = c("Lab", "CSV", "Replicate", "Fixed", "Residual"), 
+                    data = data_CSV,
+                    ratio = FALSE,
+                    nboot = 100, parallel = TRUE, adjusted = FALSE)
+rep_substrate_ET
+```
+
 
 Bayesian model
 ```{r, eval = FALSE}
@@ -1140,6 +1174,17 @@ hist(resid(model)) # some possible positive outliers
 var(data_CSV$litter)
 ```
 
+Variance Estimation (using rptR)
+```{r}
+rep_litter <- rptGaussian(litter ~ Legume*Method.comm + (1|Lab) + (1|CSV) + (1| Replicate),
+                    grname = c("Lab", "CSV", "Replicate", "Fixed", "Residual"), 
+                    data = data_CSV,
+                    ratio = FALSE,
+                    nboot = 100, parallel = TRUE, adjusted = FALSE)
+rep_litter
+```
+
+
 Bayesian model
 ```{r, eval = FALSE}
 # Litter mass (g)
@@ -1173,21 +1218,21 @@ bayes_R2(modelb_litter)
 
 Pull variance values from rptR output & Create table with variance components
 ```{r}
-
 varTable_biomass_Seed <- create_VarTable(rep_biomass_Seed, "biomass_Seed", "Lab")
 varTable_biomass_Shoot <- create_VarTable(rep_biomass_Shoot, "biomass_Shoot", "Lab")
 varTable_biomass_Root <- create_VarTable(rep_biomass_Root, "biomass_Root", "Lab")
-varTable_biomass_Total <- create_VarTable(rep_biomass_Total, "biomass_Total", "Lab")
-varTable_ratio_RootShoot <- create_VarTable(rep_ratio_RootShoot, "ratio_RootShoot", "Lab")
+varTable_height_legume <- create_VarTable(rep_height_legume, "height_legume", "Lab")
 varTable_N.shoot <- create_VarTable(rep_N.shoot, "N.shoot", "Lab")
 varTable_C.shoot <- create_VarTable(rep_C.shoot, "C.shoot", "Lab")
+varTable_substrate_ET <- create_VarTable(rep_substrate_ET, "substrate_ET", "Lab")
+varTable_litter <- create_VarTable(rep_litter, "litter", "Lab")
 
 
 # Create table
 varTable_CSV <- rbind(varTable_biomass_Seed, varTable_biomass_Shoot, 
-                      varTable_biomass_Root, varTable_biomass_Total,
-                      varTable_ratio_RootShoot, varTable_N.shoot,
-                      varTable_C.shoot)
+                      varTable_biomass_Root, varTable_height_legume,
+                      varTable_N.shoot, varTable_C.shoot,
+                      varTable_substrate_ET, varTable_litter)
 ```
 
 *Plot*
@@ -1209,6 +1254,158 @@ varTable_CSV %>%
     theme(axis.title = element_blank(), panel.grid.major.y = element_blank(), 
           legend.position = "top")
 
+```
+
+
+### Bayes model
+
+Create data frame for plotting
+```{r}
+# Function to create data frames from posterior estimates
+create_bayesVarTable <- function(posteriorVarianceDF, variableName) {
+  # make variable name usable for character
+  varName <- as.character(variableName)
+  
+  # build data frame
+  dataFrame <- posteriorVarianceDF %>% 
+  mutate(
+    iteration = 1:length(posteriorVarianceDF$P_all), # make a col to represent each test
+    Variable = as.factor(paste(variableName))         # add Variable name
+  ) %>%
+  select(P_rep, P_site, P_res, P_fix, iteration, Variable) %>%
+  pivot_longer(c(-Variable, -iteration), values_to = "Variance") # flip the table
+}
+
+# Create smaller data frames of variance proportions
+propPost_plant.N <- create_bayesVarTable(post_mat2_plant.N, "plant.N")
+propPost_plant.P <- create_bayesVarTable(post_mat2_plant.P, "plant.P")
+propPost_plant.K <- create_bayesVarTable(post_mat2_plant.K, "plant.K")
+propPost_total.ag.biomass <- create_bayesVarTable(post_mat2_total.ag.biomass, "total.ag.biomass")
+
+
+# Combine to make one data frame for plotting
+propPost <- as.data.frame(rbind(propPost_plant.N, propPost_plant.P, 
+                                propPost_plant.K, propPost_total.ag.biomass))
+```
+
+
+```{r}
+# finding average proportions of all variables
+mean_P_rep <- ((post_mat2_plant.N$P_rep + 
+                  post_mat2_plant.P$P_rep + 
+                  post_mat2_plant.K$P_rep + 
+                  post_mat2_total.ag.biomass$P_rep) / 4)
+mean_P_site <- ((post_mat2_plant.N$P_site + 
+                   post_mat2_plant.P$P_site + 
+                   post_mat2_plant.K$P_site + 
+                   post_mat2_total.ag.biomass$P_site) / 4)
+mean_P_res <- ((post_mat2_plant.N$P_res + 
+                  post_mat2_plant.P$P_res + 
+                  post_mat2_plant.K$P_res + 
+                  post_mat2_total.ag.biomass$P_res) / 4)
+mean_P_fix <- ((post_mat2_plant.N$P_fix + 
+                  post_mat2_plant.P$P_fix + 
+                  post_mat2_plant.K$P_fix + 
+                  post_mat2_total.ag.biomass$P_fix) / 4)
+
+propPost_NutNet <- as.data.frame(cbind(mean_P_rep, mean_P_site, mean_P_res, mean_P_fix))
+```
+
+
+```{r}
+# Rename variables for plotting
+propPost <- propPost %>%
+    mutate(
+    name = as.factor(recode(name,
+                        "P_fix" = "Fixed",
+                        "P_rep" = "Replicate",
+                        "P_res" = "Residual",
+                        "P_site" = "Location")),
+    Variable = as.factor(recode(Variable,
+                                "total.ag.biomass" = "Biomass",
+                                "plant.N" = "N (%)",
+                                "plant.K" = "K (%)",
+                                "plant.P" = "P (%)"))
+  ) %>%
+       arrange_at(4, desc) %>%
+     arrange(match(name, c("Location", "Residual", "Replicate", "Fixed")))
+
+# calculate mean & SE values
+propPost.sem <-
+  propPost %>% 
+  dplyr::group_by(name, Variable) %>%
+  summarise(mean = mean(Variance),
+            sem = sd(Variance) / sqrt(length(Variance)),
+            upper = mean+sem,
+            lower = mean-sem)
+
+# rearrange order of variables
+propPost.sem <- propPost.sem %>%
+     arrange_at(4, desc) %>%
+     arrange(match(name, c("Location", "Residual", "Replicate", "Fixed")))
+
+propPost.sem
+
+# Convert SE values to cumulative sums for plotting purposes
+propPost.sem2 <- within(propPost.sem,mean2 <- ave(mean,Variable, FUN=cumsum))
+
+propPost.sem2 %>% filter(Variable == "N (%)")
+
+
+
+```
+
+
+
+Stacked Bar Plot
+```{r}
+library(ggthemes)
+
+plot <- 
+  propPost.sem2 %>% mutate(
+    Component = factor(name, levels=c("Fixed", "Replicate", "Residual", "Location"))) %>% 
+  
+  ggplot(aes(x = Variable, 
+             y = mean, 
+             fill = Component, colour = Component)) + 
+  geom_bar(stat = "identity", width = .4, alpha = .8) +
+  coord_cartesian(ylim = c(0, 1)) + 
+  scale_y_continuous(labels = scales::percent) + 
+  coord_flip() +
+  labs(x = "Outcome Variables",
+       y = "Proportion of Total Variance") +
+  scale_fill_ptol() + scale_colour_ptol() + 
+  theme_minimal() + 
+  theme(legend.position = "top")
+```
+
+
+
+Side-by-side bar plots of individual variance components
+```{r}
+plot2 <- propPost %>% mutate(
+  name = factor(name, levels=c("Fixed", "Replicate", "Residual", "Location"))) %>% 
+  
+  ggplot(aes(x = Variable, y = Variance, fill = name, colour = name)) + 
+  facet_grid(rows = vars(name)) +
+  stat_summary(fun.y = mean, geom = "bar", position = "dodge",width = 1, alpha = .8) +
+  stat_summary(fun.data = mean_cl_normal, geom = "errorbar", 
+               width = 0.15, position = position_dodge(width = 0.90), colour = "black") +
+  scale_y_continuous(labels = scales::percent) +
+  labs(x = "Outcome Variables",
+       y = "Proportion of Total Variance") +
+  scale_fill_ptol() + scale_colour_ptol() + coord_flip(ylim = c(0,1)) +
+  theme_minimal() + 
+  theme(legend.position = "none",
+        strip.text.y = element_text(angle = 0))
+        # axis.text.x = element_text(angle = -90, hjust = 0)) 
+```
+
+*Variance Components Plots (Bayes)*
+```{r}
+library(patchwork)
+
+plot + plot2 + plot_layout(widths = c(2, 1))
 ```
 
 
