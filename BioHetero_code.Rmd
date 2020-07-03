@@ -801,7 +801,7 @@ data_CSV$Replicate <-  paste0(data_CSV$Block, data_CSV$Lab) # add replicate vari
 
 ```{r}
 # complete cases
-data_CSV <- data_CSV[complete.cases(data_CSV), ]
+data_CSV <- data_CSV[complete.cases(data_CSV), ] #
 ```
 
 
