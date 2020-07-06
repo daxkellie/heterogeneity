@@ -1904,11 +1904,11 @@ hist(resid(model)) # Looks great
 ```
 
 Bayesian model
-```{r}
-# modelb_nonInv_grass_cover <- brm(z_soil_stab ~ z_nonInv_grass_cover +
-#                           (1 + z_nonInv_grass_cover|ProjectName) + (1 | Replicate),
-#                         data = sdata_BLM,
-#                         chains = 2, cores = 2) # you can do more but 2 chains will be fine
+```{r, eval = FALSE}
+modelb_nonInv_grass_cover <- brm(z_soil_stab ~ z_nonInv_grass_cover +
+                          (1 + z_nonInv_grass_cover|ProjectName) + (1 | Replicate),
+                        data = sdata_BLM,
+                        chains = 2, cores = 2) # you can do more but 2 chains will be fine
 
 # Save models
 # saveRDS(modelb_nonInv_grass_cover, "modelb_nonInv_grass_cover.rds")
@@ -2415,7 +2415,7 @@ Not sure if this needs to be added (though my intuitions tell me probably not)
 
 ## PLOTS
 
-## Variance Components
+### Bayes model
 Create data frames of variance components
 ```{r}
 # Function to create data frames
@@ -2443,14 +2443,14 @@ propPost_total_foliar_cover <- create_bayesVarTable(post_mat2_total_foliar_cover
 
 
 # Combine
-propPost <- as.data.frame(rbind(propPost_nonInv_grass_cover, propPost_nonInv_forb_cover,
+propPost_BLM <- as.data.frame(rbind(propPost_nonInv_grass_cover, propPost_nonInv_forb_cover,
                                 propPost_nonInv_shrub_cover, propPost_sagebrush_cover,
                                 propPost_inv_ann_grass_cover, propPost_inv_ann_forb_cover,
                                 propPost_total_foliar_cover))
 ```
 
 
-```{r}
+```{r, eval = FALSE}
 # finding average proportions of all variables
 mean_P_rep <- ((post_mat2_plant.N$P_rep + post_mat2_plant.P$P_rep + post_mat2_plant.K$P_rep)/3)
 mean_P_site <- ((post_mat2_plant.N$P_site + post_mat2_plant.P$P_site + post_mat2_plant.K$P_site)/3)
@@ -2461,34 +2461,97 @@ propPost_NutNet <- as.data.frame(cbind(mean_P_rep, mean_P_site, mean_P_res, mean
 ```
 
 
-
-
-
-Viz - Variance Components Bayesian
 ```{r}
-library(ggthemes)
-
-propPost %>%
+# Rename variables for plotting
+propPost_BLM <- propPost_BLM %>%
     mutate(
     name = as.factor(recode(name,
                         "P_fix" = "Fixed",
                         "P_rep" = "Replicate",
                         "P_res" = "Residual",
-                        "P_site" = "Location"))
+                        "P_site" = "Location")),
+    Variable = as.factor(recode(Variable,
+                                "nonInv_grass_cover" = "Non-inv. Grass Cover",
+                                "nonInv_forb_cover" = "Non-inv. Forb Cover",
+                                "nonInv_shrub_cover" = "Non-inv. Shrub Cover",
+                                "inv_ann_grass_cover" = "Inv. Grass Cover",
+                                "inv_ann_forb_cover" = "Inv. Forb Cover",
+                                "total_foliar_cover" = "Foliar Cover",
+                                "sagebrush_cover" = "Sagebrush Cover"))
   ) %>%
-  ggplot(aes(x = Variable, y = Variance, fill = name, colour = name)) + 
-  facet_grid(~name) +
-  stat_summary(fun.y = mean, geom = "bar", position = "dodge",width = 1, alpha = .8) +
-  stat_summary(fun.data = mean_cl_normal, geom = "errorbar", 
-               width = 0.15, position = position_dodge(width = 0.90), colour = "black") +
+       arrange_at(4, desc) %>%
+     arrange(match(name, c("Location", "Residual", "Replicate", "Fixed")))
+
+# calculate mean & SE values
+propPost_BLM.sem <-
+  propPost_BLM %>% 
+  dplyr::group_by(name, Variable) %>%
+  summarise(mean = mean(Variance),
+            sem = sd(Variance),
+            upper = mean+sem,
+            lower = mean-sem)
+
+# rearrange order of variables
+propPost_BLM.sem <- propPost_BLM.sem %>%
+     arrange_at(4, desc) %>%
+     arrange(match(name, c("Location", "Residual", "Replicate", "Fixed")))
+
+propPost_BLM.sem
+
+# Convert SE values to cumulative sums for plotting purposes
+propPost_BLM.sem2 <- within(propPost_BLM.sem,mean2 <- ave(mean,Variable, FUN=cumsum))
+
+propPost_BLM.sem2 %>% filter(Variable == "Sagebrush Cover")
+```
+
+
+Stacked Bar Plot
+```{r}
+plot1_BLM <- 
+  propPost_BLM.sem2 %>% mutate(
+    Component = factor(name, levels=c("Fixed", "Replicate", "Residual", "Location"))) %>% 
+  
+  ggplot(aes(x = Variable, 
+             y = mean, 
+             fill = Component, colour = Component)) + 
+  geom_bar(stat = "identity", width = .4, alpha = .8) +
   coord_cartesian(ylim = c(0, 1)) + 
-  scale_y_continuous(labels = scales::percent) +
-  labs(x = "Variance Components",
+  scale_y_continuous(labels = scales::percent) + 
+  coord_flip() +
+  labs(x = "Outcome Variables",
        y = "Proportion of Total Variance") +
   scale_fill_ptol() + scale_colour_ptol() + 
   theme_minimal() + 
-  theme(legend.position = "top",
-        axis.text.x = element_text(angle = -90, hjust = 1))
+  theme(legend.position = "top")
+```
+
+
+
+Side-by-side bar plots of individual variance components
+```{r}
+plot2_BLM <- propPost_BLM %>% mutate(
+  name = factor(name, levels=c("Fixed", "Replicate", "Residual", "Location"))) %>% 
+  
+  ggplot(aes(x = Variable, y = Variance, fill = name, colour = name)) + 
+  facet_grid(rows = vars(name)) +
+  stat_summary(fun.y = mean, geom = "bar", position = "dodge",width = 1, alpha = .8) +
+  stat_summary(fun.data = mean_cl_normal, geom = "errorbar", 
+               width = 0.15, position = position_dodge(width = 0.90), colour = "black") +
+  scale_y_continuous(labels = scales::percent) +
+  labs(x = "Outcome Variables",
+       y = "Proportion of Total Variance") +
+  scale_fill_ptol() + scale_colour_ptol() + coord_flip(ylim = c(0,1)) +
+  theme_minimal() + 
+  theme(legend.position = "none",
+        strip.text.y = element_text(angle = 0, size = 8))
+        # axis.text.x = element_text(angle = -90, hjust = 0)) 
+```
+
+*Variance Components Plots (Bayes)*
+```{r}
+library(patchwork)
+
+plot1_BLM + plot2_BLM + plot_layout(widths = c(2, 1))
 ```
 
 
