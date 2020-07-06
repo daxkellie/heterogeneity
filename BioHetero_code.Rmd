@@ -1776,9 +1776,11 @@ data_BLM %>% head(5)
 dim(data_BLM)
 ```
 
-## Data Wrangling
+*Data Wrangling*
 
-##### Limit data to arid grassland/steppe
+***
+
+Limit data to arid grassland/steppe
 ```{r}
 # Eliminate plots with >5% tree cover
 data_BLM <- data_BLM %>%
@@ -1802,7 +1804,7 @@ Data set reduced from > 10,000 points to 2,812
 
 
 
-##### Create replicate variable
+Create replicate variable
 ```{r}
 # Add Year to its own column
 list_years <- c("2000", "2001", "2002", "2003", "2004", 
@@ -1813,7 +1815,7 @@ list_years <- c("2000", "2001", "2002", "2003", "2004",
 data_BLM <- map_df(list_years, ~ filter(data_BLM, str_detect(ProjectName, .x)) %>%
                     mutate(Year = str_extract(ProjectName, .x)))
 
-# Removing year from ProjectName
+# Separate year from ProjectName
 data_BLM <- data_BLM %>%
   mutate(
     ProjectName = as.factor(gsub("([0-9]+).*$", "", ProjectName))
@@ -1821,7 +1823,7 @@ data_BLM <- data_BLM %>%
 
 
 # Create replicate variable
-data_BLM$Replicate <-  paste0(data_BLM$ProjectName, data_BLM$Year)
+data_BLM$Replicate <- paste0(data_BLM$ProjectName, data_BLM$Year)
 ```
 
 
@@ -1829,16 +1831,18 @@ data_BLM$Replicate <-  paste0(data_BLM$ProjectName, data_BLM$Year)
 
 ## Analysis
 
-Dax says:
+Difference between BLM variable names:  
 
 __ProjectName__: Refers to the broader project area the data was collected in. Generally includes the state, BLM management office and year.
-(what Tim says we can treat as our "site/location" variable)
+(what Tim says we can treat as our "site/location" variable)  
 __PlotID__: Name for each location or "plot" where data is collected, as assigned by the data collector. Duplicate Plot ID's may exist among different Sites and Projects, but not within the same Site.
-(So each PlotID is unique)
+(So each PlotID is unique)  
 __PlotKey__: Unique numeric ID associated with each plot location. This is automatically generated in DIMA the first time the plot is created. Future visits to the same plot might use the same PlotKey. Users are encouraged to use spatial joins to track trend over time.
-(So sometimes, but not always, there may be multiple years of data for a plot location, which is tracked using this variable)
+(So sometimes, but not always, there may be multiple years of data for a plot location, which is tracked using this variable)  
 
+<br>
 
+Frequency distributions
 ```{r}
 # transforming some of the data
 # Note that soil stablity is a measurement 0 - 6 (how this is determined - some sort of artificial scale???)
