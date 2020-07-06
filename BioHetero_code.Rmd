@@ -1628,12 +1628,14 @@ propPost_litter <- create_bayesVarTable(post_mat2_litter, "litter")
 
 
 # Combine to make one data frame for plotting
-propPost <- as.data.frame(rbind(propPost_plant.N, propPost_plant.P, 
-                                propPost_plant.K, propPost_total.ag.biomass))
+propPost_CSV <- as.data.frame(rbind(propPost_biomass_Seed, propPost_biomass_Shoot, 
+                                propPost_biomass_Root, propPost_height_legume,
+                                propPost_N.shoot, propPost_C.shoot,
+                                propPost_substrate_ET, propPost_litter))
 ```
 
 
-```{r}
+```{r, eval = FALSE}
 # finding average proportions of all variables
 mean_P_rep <- ((post_mat2_plant.N$P_rep + 
                   post_mat2_plant.P$P_rep + 
@@ -1652,48 +1654,53 @@ mean_P_fix <- ((post_mat2_plant.N$P_fix +
                   post_mat2_plant.K$P_fix + 
                   post_mat2_total.ag.biomass$P_fix) / 4)
 
-propPost_NutNet <- as.data.frame(cbind(mean_P_rep, mean_P_site, mean_P_res, mean_P_fix))
+propPost_CSV.mean <- as.data.frame(cbind(mean_P_rep, mean_P_site, mean_P_res, mean_P_fix))
 ```
 
 
 ```{r}
 # Rename variables for plotting
-propPost <- propPost %>%
+propPost_CSV <- propPost_CSV %>%
     mutate(
     name = as.factor(recode(name,
                         "P_fix" = "Fixed",
                         "P_rep" = "Replicate",
+                        "P_CSV" = "CSV",
                         "P_res" = "Residual",
                         "P_site" = "Location")),
     Variable = as.factor(recode(Variable,
-                                "total.ag.biomass" = "Biomass",
-                                "plant.N" = "N (%)",
-                                "plant.K" = "K (%)",
-                                "plant.P" = "P (%)"))
+                                "biomass_Seed" = "Seed Biomass",
+                                "height_legume" = "Legume Height",
+                                "biomass_Shoot" = "Shoot Biomass",
+                                "biomass_Root" = "Root Biomass",
+                                "N.shoot" = "N (shoot)",
+                                "C.shoot" = "C (shoot)",
+                                "substrate_ET" = "Evapotranspiration",
+                                "litter" = "Litter Decomposition"))
   ) %>%
        arrange_at(4, desc) %>%
-     arrange(match(name, c("Location", "Residual", "Replicate", "Fixed")))
+     arrange(match(name, c("Location", "Residual", "Replicate", "CSV", "Fixed")))
 
 # calculate mean & SE values
-propPost.sem <-
-  propPost %>% 
+propPost_CSV.sem <-
+  propPost_CSV %>% 
   dplyr::group_by(name, Variable) %>%
   summarise(mean = mean(Variance),
-            sem = sd(Variance) / sqrt(length(Variance)),
+            sem = sd(Variance),
             upper = mean+sem,
             lower = mean-sem)
 
 # rearrange order of variables
-propPost.sem <- propPost.sem %>%
+propPost_CSV.sem <- propPost_CSV.sem %>%
      arrange_at(4, desc) %>%
-     arrange(match(name, c("Location", "Residual", "Replicate", "Fixed")))
+     arrange(match(name, c("Location", "Residual", "Replicate", "CSV", "Fixed")))
 
-propPost.sem
+propPost_CSV.sem
 
 # Convert SE values to cumulative sums for plotting purposes
-propPost.sem2 <- within(propPost.sem,mean2 <- ave(mean,Variable, FUN=cumsum))
+propPost_CSV.sem2 <- within(propPost_CSV.sem,mean2 <- ave(mean,Variable, FUN=cumsum))
 
-propPost.sem2 %>% filter(Variable == "N (%)")
+propPost_CSV.sem2 %>% filter(Variable == "Shoot Biomass")
 
 
 
@@ -1705,9 +1712,9 @@ Stacked Bar Plot
 ```{r}
 library(ggthemes)
 
-plot <- 
-  propPost.sem2 %>% mutate(
-    Component = factor(name, levels=c("Fixed", "Replicate", "Residual", "Location"))) %>% 
+plot1_CSV <- 
+  propPost_CSV.sem2 %>% mutate(
+    Component = factor(name, levels=c("Fixed", "CSV", "Replicate", "Residual", "Location"))) %>% 
   
   ggplot(aes(x = Variable, 
              y = mean, 
@@ -1727,8 +1734,8 @@ plot <-
 
 Side-by-side bar plots of individual variance components
 ```{r}
-plot2 <- propPost %>% mutate(
-  name = factor(name, levels=c("Fixed", "Replicate", "Residual", "Location"))) %>% 
+plot2_CSV <- propPost_CSV %>% mutate(
+  name = factor(name, levels=c("Fixed", "CSV", "Replicate", "Residual", "Location"))) %>% 
   
   ggplot(aes(x = Variable, y = Variance, fill = name, colour = name)) + 
   facet_grid(rows = vars(name)) +
@@ -1741,7 +1748,7 @@ plot2 <- propPost %>% mutate(
   scale_fill_ptol() + scale_colour_ptol() + coord_flip(ylim = c(0,1)) +
   theme_minimal() + 
   theme(legend.position = "none",
-        strip.text.y = element_text(angle = 0))
+        strip.text.y = element_text(angle = 0, size = 8))
         # axis.text.x = element_text(angle = -90, hjust = 0)) 
 ```
 
@@ -1749,10 +1756,17 @@ plot2 <- propPost %>% mutate(
 ```{r}
 library(patchwork)
 
-plot + plot2 + plot_layout(widths = c(2, 1))
+plot1_CSV + plot2_CSV + plot_layout(widths = c(2, 1))
 ```
 
+CSV: Controlled Systematic Variance  
+Location: (N = 14)  
 
+<br>
+
+***
+
+<br>
 
 
 # (III) BLM Data
