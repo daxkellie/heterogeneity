@@ -864,6 +864,50 @@ modelb_biomass_Seed <- readRDS("model_biomass_Seed.rds")
 bayes_R2(modelb_biomass_Seed)
 ```
 
+```{r}
+# get all posterior samples
+post <- posterior_samples(modelb_biomass_Seed)
+
+names(post)
+
+# we get what we need - for random effect
+V_rep <-post$sd_Replicate__Intercept^2 # making it variance
+V_site <-post$sd_Lab__Intercept^2
+V_CSV <- post$sd_CSV__Intercept^2
+V_res <- post$sigma^2 
+```
+
+
+```{r}
+# calculate variance for fixed effects
+
+# get a data frame of different posterior of fixed effects
+post_fix <- as.data.frame(t(post[,1:4]))
+
+# get a posterior of fixed effects
+V_fix <-  map_dbl(post_fix, ~ var(as.vector(. %*% t(model@pp$X))) )
+
+# mcmc object (from coda package)
+post_mat <- as.mcmc(data.frame(V_rep, V_site, V_CSV, V_res, V_fix, row.names = NULL))
+
+summary(post_mat)
+plot(post_mat)
+
+head(post_mat)
+
+post_mat %>% 
+  data.frame %>% 
+  mutate(V_all = V_rep + V_site + V_CSV + V_res + V_fix,
+         P_rep = V_rep/(V_rep + V_site + V_CSV + V_res + V_fix),
+         P_site = V_site/(V_rep + V_site + V_CSV + V_res + V_fix),
+         P_CSV = V_CSV/(V_rep + V_site + V_CSV + V_res + V_fix),
+         P_res = V_res/(V_rep + V_site + V_CSV + V_res + V_fix),
+         P_fix = V_fix/(V_rep + V_site + V_CSV + V_res + V_fix),
+         P_all = P_rep + P_site + P_CSV + P_res + P_fix)          ->  post_mat2_biomass_Seed
+
+```
+
+
 
 ### Shoot Biomass
 
@@ -914,6 +958,50 @@ bayes_R2(modelb_biomass_Shoot)
 ```
 
 
+```{r}
+# get all posterior samples
+post <- posterior_samples(modelb_biomass_Shoot)
+
+
+# we get what we need - for random effect
+V_rep <-post$sd_Replicate__Intercept^2 # making it variance
+V_site <-post$sd_Lab__Intercept^2
+V_CSV <- post$sd_CSV__Intercept^2
+V_res <- post$sigma^2 
+```
+
+
+```{r}
+# calculate variance for fixed effects
+
+# get a data frame of different posterior of fixed effects
+post_fix <- as.data.frame(t(post[,1:4]))
+
+# get a posterior of fixed effects
+V_fix <-  map_dbl(post_fix, ~ var(as.vector(. %*% t(model@pp$X))) )
+
+# mcmc object (from coda package)
+post_mat <- as.mcmc(data.frame(V_rep, V_site, V_CSV, V_res, V_fix, row.names = NULL))
+
+summary(post_mat)
+plot(post_mat)
+
+head(post_mat)
+
+post_mat %>% 
+  data.frame %>% 
+  mutate(V_all = V_rep + V_site + V_CSV + V_res + V_fix,
+         P_rep = V_rep/(V_rep + V_site + V_CSV + V_res + V_fix),
+         P_site = V_site/(V_rep + V_site + V_CSV + V_res + V_fix),
+         P_CSV = V_CSV/(V_rep + V_site + V_CSV + V_res + V_fix),
+         P_res = V_res/(V_rep + V_site + V_CSV + V_res + V_fix),
+         P_fix = V_fix/(V_rep + V_site + V_CSV + V_res + V_fix),
+         P_all = P_rep + P_site + P_CSV + P_res + P_fix)          ->  post_mat2_biomass_Shoot
+
+```
+
+
+
 
 ### Root Biomass
 
@@ -961,7 +1049,47 @@ modelb_biomass_Root <- readRDS("model_biomass_Root.rds")
 bayes_R2(modelb_biomass_Root)
 ```
 
+```{r}
+# get all posterior samples
+post <- posterior_samples(modelb_biomass_Root)
 
+
+# we get what we need - for random effect
+V_rep <-post$sd_Replicate__Intercept^2 # making it variance
+V_site <-post$sd_Lab__Intercept^2
+V_CSV <- post$sd_CSV__Intercept^2
+V_res <- post$sigma^2 
+```
+
+
+```{r}
+# calculate variance for fixed effects
+
+# get a data frame of different posterior of fixed effects
+post_fix <- as.data.frame(t(post[,1:4]))
+
+# get a posterior of fixed effects
+V_fix <-  map_dbl(post_fix, ~ var(as.vector(. %*% t(model@pp$X))) )
+
+# mcmc object (from coda package)
+post_mat <- as.mcmc(data.frame(V_rep, V_site, V_CSV, V_res, V_fix, row.names = NULL))
+
+summary(post_mat)
+plot(post_mat)
+
+head(post_mat)
+
+post_mat %>% 
+  data.frame %>% 
+  mutate(V_all = V_rep + V_site + V_CSV + V_res + V_fix,
+         P_rep = V_rep/(V_rep + V_site + V_CSV + V_res + V_fix),
+         P_site = V_site/(V_rep + V_site + V_CSV + V_res + V_fix),
+         P_CSV = V_CSV/(V_rep + V_site + V_CSV + V_res + V_fix),
+         P_res = V_res/(V_rep + V_site + V_CSV + V_res + V_fix),
+         P_fix = V_fix/(V_rep + V_site + V_CSV + V_res + V_fix),
+         P_all = P_rep + P_site + P_CSV + P_res + P_fix)          ->  post_mat2_biomass_Root
+
+```
 
 
 ### Legume Height
@@ -1008,6 +1136,48 @@ modelb_height_legume <- readRDS("model_height_legume.rds")
 
 # bayesian R2 estimate of regression model
 bayes_R2(modelb_height_legume)
+```
+
+```{r}
+# get all posterior samples
+post <- posterior_samples(modelb_height_legume)
+
+
+# we get what we need - for random effect
+V_rep <-post$sd_Replicate__Intercept^2 # making it variance
+V_site <-post$sd_Lab__Intercept^2
+V_CSV <- post$sd_CSV__Intercept^2
+V_res <- post$sigma^2 
+```
+
+
+```{r}
+# calculate variance for fixed effects
+
+# get a data frame of different posterior of fixed effects
+post_fix <- as.data.frame(t(post[,1:4]))
+
+# get a posterior of fixed effects
+V_fix <-  map_dbl(post_fix, ~ var(as.vector(. %*% t(model@pp$X))) )
+
+# mcmc object (from coda package)
+post_mat <- as.mcmc(data.frame(V_rep, V_site, V_CSV, V_res, V_fix, row.names = NULL))
+
+summary(post_mat)
+plot(post_mat)
+
+head(post_mat)
+
+post_mat %>% 
+  data.frame %>% 
+  mutate(V_all = V_rep + V_site + V_CSV + V_res + V_fix,
+         P_rep = V_rep/(V_rep + V_site + V_CSV + V_res + V_fix),
+         P_site = V_site/(V_rep + V_site + V_CSV + V_res + V_fix),
+         P_CSV = V_CSV/(V_rep + V_site + V_CSV + V_res + V_fix),
+         P_res = V_res/(V_rep + V_site + V_CSV + V_res + V_fix),
+         P_fix = V_fix/(V_rep + V_site + V_CSV + V_res + V_fix),
+         P_all = P_rep + P_site + P_CSV + P_res + P_fix)          ->  post_mat2_height_legume
+
 ```
 
 
@@ -1058,7 +1228,47 @@ modelb_N.shoot <- readRDS("model_Nshoot.rds")
 bayes_R2(modelb_N.shoot)
 ```
 
+```{r}
+# get all posterior samples
+post <- posterior_samples(modelb_N.shoot)
 
+
+# we get what we need - for random effect
+V_rep <-post$sd_Replicate__Intercept^2 # making it variance
+V_site <-post$sd_Lab__Intercept^2
+V_CSV <- post$sd_CSV__Intercept^2
+V_res <- post$sigma^2 
+```
+
+
+```{r}
+# calculate variance for fixed effects
+
+# get a data frame of different posterior of fixed effects
+post_fix <- as.data.frame(t(post[,1:4]))
+
+# get a posterior of fixed effects
+V_fix <-  map_dbl(post_fix, ~ var(as.vector(. %*% t(model@pp$X))) )
+
+# mcmc object (from coda package)
+post_mat <- as.mcmc(data.frame(V_rep, V_site, V_CSV, V_res, V_fix, row.names = NULL))
+
+summary(post_mat)
+plot(post_mat)
+
+head(post_mat)
+
+post_mat %>% 
+  data.frame %>% 
+  mutate(V_all = V_rep + V_site + V_CSV + V_res + V_fix,
+         P_rep = V_rep/(V_rep + V_site + V_CSV + V_res + V_fix),
+         P_site = V_site/(V_rep + V_site + V_CSV + V_res + V_fix),
+         P_CSV = V_CSV/(V_rep + V_site + V_CSV + V_res + V_fix),
+         P_res = V_res/(V_rep + V_site + V_CSV + V_res + V_fix),
+         P_fix = V_fix/(V_rep + V_site + V_CSV + V_res + V_fix),
+         P_all = P_rep + P_site + P_CSV + P_res + P_fix)          ->  post_mat2_N.shoot
+
+```
 
 
 
@@ -1107,6 +1317,48 @@ modelb_C.shoot <- readRDS("model_Cshoot.rds")
 
 # bayesian R2 estimate of regression model
 bayes_R2(modelb_C.shoot)
+```
+
+```{r}
+# get all posterior samples
+post <- posterior_samples(modelb_C.shoot)
+
+
+# we get what we need - for random effect
+V_rep <-post$sd_Replicate__Intercept^2 # making it variance
+V_site <-post$sd_Lab__Intercept^2
+V_CSV <- post$sd_CSV__Intercept^2
+V_res <- post$sigma^2 
+```
+
+
+```{r}
+# calculate variance for fixed effects
+
+# get a data frame of different posterior of fixed effects
+post_fix <- as.data.frame(t(post[,1:4]))
+
+# get a posterior of fixed effects
+V_fix <-  map_dbl(post_fix, ~ var(as.vector(. %*% t(model@pp$X))) )
+
+# mcmc object (from coda package)
+post_mat <- as.mcmc(data.frame(V_rep, V_site, V_CSV, V_res, V_fix, row.names = NULL))
+
+summary(post_mat)
+plot(post_mat)
+
+head(post_mat)
+
+post_mat %>% 
+  data.frame %>% 
+  mutate(V_all = V_rep + V_site + V_CSV + V_res + V_fix,
+         P_rep = V_rep/(V_rep + V_site + V_CSV + V_res + V_fix),
+         P_site = V_site/(V_rep + V_site + V_CSV + V_res + V_fix),
+         P_CSV = V_CSV/(V_rep + V_site + V_CSV + V_res + V_fix),
+         P_res = V_res/(V_rep + V_site + V_CSV + V_res + V_fix),
+         P_fix = V_fix/(V_rep + V_site + V_CSV + V_res + V_fix),
+         P_all = P_rep + P_site + P_CSV + P_res + P_fix)          ->  post_mat2_C.shoot
+
 ```
 
 
@@ -1158,6 +1410,50 @@ modelb_substrate_ET <- readRDS("model_substrate_ET.rds")
 bayes_R2(modelb_substrate_ET)
 ```
 
+```{r}
+# get all posterior samples
+post <- posterior_samples(modelb_substrate_ET)
+
+
+# we get what we need - for random effect
+V_rep <-post$sd_Replicate__Intercept^2 # making it variance
+V_site <-post$sd_Lab__Intercept^2
+V_CSV <- post$sd_CSV__Intercept^2
+V_res <- post$sigma^2 
+```
+
+
+```{r}
+# calculate variance for fixed effects
+
+# get a data frame of different posterior of fixed effects
+post_fix <- as.data.frame(t(post[,1:4]))
+
+# get a posterior of fixed effects
+V_fix <-  map_dbl(post_fix, ~ var(as.vector(. %*% t(model@pp$X))) )
+
+# mcmc object (from coda package)
+post_mat <- as.mcmc(data.frame(V_rep, V_site, V_CSV, V_res, V_fix, row.names = NULL))
+
+summary(post_mat)
+plot(post_mat)
+
+head(post_mat)
+
+post_mat %>% 
+  data.frame %>% 
+  mutate(V_all = V_rep + V_site + V_CSV + V_res + V_fix,
+         P_rep = V_rep/(V_rep + V_site + V_CSV + V_res + V_fix),
+         P_site = V_site/(V_rep + V_site + V_CSV + V_res + V_fix),
+         P_CSV = V_CSV/(V_rep + V_site + V_CSV + V_res + V_fix),
+         P_res = V_res/(V_rep + V_site + V_CSV + V_res + V_fix),
+         P_fix = V_fix/(V_rep + V_site + V_CSV + V_res + V_fix),
+         P_all = P_rep + P_site + P_CSV + P_res + P_fix)          ->  post_mat2_substrate_ET
+
+```
+
+
+
 ### Litter Decomposition
 
 Frequentist model
@@ -1205,6 +1501,49 @@ modelb_litter <- readRDS("model_litter.rds")
 bayes_R2(modelb_litter)
 ```
 
+```{r}
+# get all posterior samples
+post <- posterior_samples(modelb_litter)
+
+
+# we get what we need - for random effect
+V_rep <-post$sd_Replicate__Intercept^2 # making it variance
+V_site <-post$sd_Lab__Intercept^2
+V_CSV <- post$sd_CSV__Intercept^2
+V_res <- post$sigma^2 
+```
+
+
+```{r}
+# calculate variance for fixed effects
+
+# get a data frame of different posterior of fixed effects
+post_fix <- as.data.frame(t(post[,1:4]))
+
+# get a posterior of fixed effects
+V_fix <-  map_dbl(post_fix, ~ var(as.vector(. %*% t(model@pp$X))) )
+
+# mcmc object (from coda package)
+post_mat <- as.mcmc(data.frame(V_rep, V_site, V_CSV, V_res, V_fix, row.names = NULL))
+
+summary(post_mat)
+plot(post_mat)
+
+head(post_mat)
+
+post_mat %>% 
+  data.frame %>% 
+  mutate(V_all = V_rep + V_site + V_CSV + V_res + V_fix,
+         P_rep = V_rep/(V_rep + V_site + V_CSV + V_res + V_fix),
+         P_site = V_site/(V_rep + V_site + V_CSV + V_res + V_fix),
+         P_CSV = V_CSV/(V_rep + V_site + V_CSV + V_res + V_fix),
+         P_res = V_res/(V_rep + V_site + V_CSV + V_res + V_fix),
+         P_fix = V_fix/(V_rep + V_site + V_CSV + V_res + V_fix),
+         P_all = P_rep + P_site + P_CSV + P_res + P_fix)          ->  post_mat2_litter
+
+```
+
+
 
 <br>
 
@@ -1234,6 +1573,7 @@ varTable_CSV <- rbind(varTable_biomass_Seed, varTable_biomass_Shoot,
                       varTable_N.shoot, varTable_C.shoot,
                       varTable_substrate_ET, varTable_litter)
 ```
+
 
 *Plot*
 ```{r}
@@ -1272,15 +1612,19 @@ create_bayesVarTable <- function(posteriorVarianceDF, variableName) {
     iteration = 1:length(posteriorVarianceDF$P_all), # make a col to represent each test
     Variable = as.factor(paste(variableName))         # add Variable name
   ) %>%
-  select(P_rep, P_site, P_res, P_fix, iteration, Variable) %>%
+  select(P_rep, P_site, P_CSV, P_res, P_fix, iteration, Variable) %>%
   pivot_longer(c(-Variable, -iteration), values_to = "Variance") # flip the table
 }
 
 # Create smaller data frames of variance proportions
-propPost_plant.N <- create_bayesVarTable(post_mat2_plant.N, "plant.N")
-propPost_plant.P <- create_bayesVarTable(post_mat2_plant.P, "plant.P")
-propPost_plant.K <- create_bayesVarTable(post_mat2_plant.K, "plant.K")
-propPost_total.ag.biomass <- create_bayesVarTable(post_mat2_total.ag.biomass, "total.ag.biomass")
+propPost_biomass_Seed <- create_bayesVarTable(post_mat2_biomass_Seed, "biomass_Seed")
+propPost_biomass_Shoot <- create_bayesVarTable(post_mat2_biomass_Shoot, "biomass_Shoot")
+propPost_biomass_Root <- create_bayesVarTable(post_mat2_biomass_Root, "biomass_Root")
+propPost_height_legume <- create_bayesVarTable(post_mat2_height_legume, "height_legume")
+propPost_N.shoot <- create_bayesVarTable(post_mat2_N.shoot, "N.shoot")
+propPost_C.shoot <- create_bayesVarTable(post_mat2_C.shoot, "C.shoot")
+propPost_substrate_ET <- create_bayesVarTable(post_mat2_substrate_ET, "substrate_ET")
+propPost_litter <- create_bayesVarTable(post_mat2_litter, "litter")
 
 
 # Combine to make one data frame for plotting
