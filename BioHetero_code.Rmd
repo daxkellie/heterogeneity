@@ -2409,6 +2409,8 @@ Tim also named 'Soil Stability Protected Surface Rating' vs 'Soil Stability Unpr
   
 Not sure if this needs to be added (though my intuitions tell me probably not)
 
+## PLOTS
+
 ## Variance Components
 Create data frames of variance components
 ```{r}
@@ -2456,7 +2458,9 @@ propPost_NutNet <- as.data.frame(cbind(mean_P_rep, mean_P_site, mean_P_res, mean
 
 
 
-## Viz - Variance Components Bayesian
+
+
+Viz - Variance Components Bayesian
 ```{r}
 library(ggthemes)
 
