@@ -585,7 +585,7 @@ propPost.sem <-
   propPost %>% 
   dplyr::group_by(name, Variable) %>%
   summarise(mean = mean(Variance),
-            sem = sd(Variance) / sqrt(length(Variance)),
+            sem = sd(Variance),
             upper = mean+sem,
             lower = mean-sem)
 
@@ -600,9 +600,6 @@ propPost.sem
 propPost.sem2 <- within(propPost.sem,mean2 <- ave(mean,Variable, FUN=cumsum))
 
 propPost.sem2 %>% filter(Variable == "N (%)")
-
-
-
 ```
 
 
@@ -1830,7 +1827,7 @@ data_BLM$Replicate <-  paste0(data_BLM$ProjectName, data_BLM$Year)
 
 
 
-## Example Model for Dax
+## Analysis
 
 Dax says:
 
@@ -1844,7 +1841,7 @@ __PlotKey__: Unique numeric ID associated with each plot location. This is autom
 
 ```{r}
 # transforming some of the data
-# one problem I see is that soil stablity seems like a maesurement 0 - 6 (how this is determined - some sort of artificial scale???)
+# Note that soil stablity is a measurement 0 - 6 (how this is determined - some sort of artificial scale???)
 hist(data_BLM$SoilStability_All)
 hist(data_BLM$SoilStability_Protected)
 hist(data_BLM$NonInvPerenGrassCover_AH)
@@ -1927,7 +1924,7 @@ post <- posterior_samples(modelb_nonInv_grass_cover)
 
 # we get what we need - for random effect
 V_rep <-post$sd_Replicate__Intercept^2 # making it variance
-V_site <-post$sd_ProjectName__Intercept^2 + post$sd_ProjectName__z_nonInv_grass_cover
+V_site <-post$sd_ProjectName__Intercept^2 + post$sd_ProjectName__z_nonInv_grass_cover^2
 V_res <- post$sigma^2 
 ```
 
@@ -2001,7 +1998,7 @@ post <- posterior_samples(modelb_nonInv_forb_cover)
 
 # we get what we need - for random effect
 V_rep <-post$sd_Replicate__Intercept^2 # making it variance
-V_site <-post$sd_ProjectName__Intercept^2 + post$sd_ProjectName__z_nonInv_forb_cover
+V_site <-post$sd_ProjectName__Intercept^2 + post$sd_ProjectName__z_nonInv_forb_cover^2
 V_res <- post$sigma^2 
 ```
 
@@ -2075,7 +2072,7 @@ post <- posterior_samples(modelb_nonInv_shrub_cover)
 
 # we get what we need - for random effect
 V_rep <-post$sd_Replicate__Intercept^2 # making it variance
-V_site <-post$sd_ProjectName__Intercept^2 + post$sd_ProjectName__z_nonInv_shrub_cover
+V_site <-post$sd_ProjectName__Intercept^2 + post$sd_ProjectName__z_nonInv_shrub_cover^2
 V_res <- post$sigma^2 
 ```
 
@@ -2150,7 +2147,7 @@ post <- posterior_samples(modelb_sagebrush_cover)
 
 # we get what we need - for random effect
 V_rep <-post$sd_Replicate__Intercept^2 # making it variance
-V_site <-post$sd_ProjectName__Intercept^2 + post$sd_ProjectName__z_sagebrush_cover
+V_site <-post$sd_ProjectName__Intercept^2 + post$sd_ProjectName__z_sagebrush_cover^2
 V_res <- post$sigma^2 
 ```
 
@@ -2225,7 +2222,7 @@ post <- posterior_samples(modelb_inv_ann_grass_cover)
 
 # we get what we need - for random effect
 V_rep <-post$sd_Replicate__Intercept^2 # making it variance
-V_site <-post$sd_ProjectName__Intercept^2 + post$sd_ProjectName__z_inv_ann_grass_cover
+V_site <-post$sd_ProjectName__Intercept^2 + post$sd_ProjectName__z_inv_ann_grass_cover^2
 V_res <- post$sigma^2 
 ```
 
@@ -2301,7 +2298,7 @@ post <- posterior_samples(modelb_inv_ann_forb_cover)
 
 # we get what we need - for random effect
 V_rep <-post$sd_Replicate__Intercept^2 # making it variance
-V_site <-post$sd_ProjectName__Intercept^2 + post$sd_ProjectName__z_inv_ann_forb_cover
+V_site <-post$sd_ProjectName__Intercept^2 + post$sd_ProjectName__z_inv_ann_forb_cover^2
 V_res <- post$sigma^2 
 ```
 
