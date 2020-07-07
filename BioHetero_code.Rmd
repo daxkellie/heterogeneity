@@ -561,6 +561,13 @@ mean_P_fix <- ((post_mat2_plant.N$P_fix +
 propPost_NutNet <- as.data.frame(cbind(mean_P_rep, mean_P_site, mean_P_res, mean_P_fix))
 ```
 
+```{r}
+propPost_NutNet %>% 
+  pivot_longer(everything(), values_to = "Variance") %>% 
+  group_by(name) %>%
+  summarise_all(.funs = c(Mean = "mean", sd = "sd"))
+```
+
 
 ```{r}
 # Rename variables for plotting
