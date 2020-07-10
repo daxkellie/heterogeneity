@@ -1779,8 +1779,10 @@ Location: (N = 14)
 
 ```{r}
 data_BLM %>% glimpse()
-data_BLM %>% head(5)
+data_BLM %>% head(30) %>% arrange(desc(PlotID))
 dim(data_BLM)
+
+# combine projectName with PlotID, only use one year
 ```
 
 *Data Wrangling*
