@@ -1930,7 +1930,21 @@ levels(data_BLM$ProjectName)
 
 # Create replicate variable
 #   Plots within each project (combined to avoid accidental duplicates across projects)
+
+# Each row of data is a replicate, so this may not be necessary
+
 data_BLM$Replicate <- paste0(data_BLM$ProjectName, data_BLM$PlotID)
+
+
+# How many replicates in ProjectName?
+data_BLM %>% 
+  group_by(as.factor(ProjectName)) %>%
+  summarise(no_rows = length(as.factor(ProjectName)))
+
+# How many in PlotKey?
+data_BLM %>% 
+  group_by(as.factor(PlotID)) %>%
+  summarise(no_rows = length(as.factor(PlotID)))
 ```
 
 
@@ -1976,7 +1990,8 @@ data_BLM %>%
     z_sagebrush_cover = scale(SagebrushCover_AH),
     z_inv_ann_grass_cover = scale(InvAnnGrassCover_AH),
     z_inv_ann_forb_cover = scale(InvAnnForbCover_AH),
-    z_total_foliar_cover = scale(TotalFoliarCover_FH)
+    z_total_foliar_cover = scale(TotalFoliarCover_FH),
+    PlotKey = as.factor(PlotKey)
     ) %>% 
   select(ProjectName, PlotID, Replicate, z_soil_stab, z_nonInv_grass_cover,
          z_nonInv_forb_cover, z_nonInv_shrub_cover, z_sagebrush_cover,
@@ -1991,7 +2006,7 @@ summary(model)
 hist(resid(model)) # Looks great
 
 # random intercept model
-model0 <- lmer(z_soil_stab ~ z_nonInv_grass_cover + (1 |ProjectName) + (1 | Replicate), 
+model0 <- lmer(z_soil_stab ~ z_nonInv_grass_cover + (1 |PlotKey), 
                data = sdata_BLM)
 summary(model0)
 hist(resid(model0)) 
