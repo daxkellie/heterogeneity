@@ -2520,6 +2520,69 @@ Tim also named 'Soil Stability Protected Surface Rating' vs 'Soil Stability Unpr
   
 Not sure if this needs to be added (though my intuitions tell me probably not)
 
+
+<br>
+
+***
+
+<br>
+
+
+## Means & SDs
+
+Average variance components across all variables within NutNet data set
+```{r}
+# finding average proportions of all variables
+mean_P_rep <- ((post_mat2_nonInv_grass_cover$P_rep + 
+                  post_mat2_nonInv_forb_cover$P_rep + 
+                  post_mat2_nonInv_shrub_cover$P_rep + 
+                  post_mat2_sagebrush_cover$P_rep + 
+                  post_mat2_inv_ann_grass_cover$P_rep + 
+                  post_mat2_inv_ann_forb_cover$P_rep + 
+                  post_mat2_total_foliar_cover$P_rep) / 7)
+mean_P_site <- ((post_mat2_nonInv_grass_cover$P_site + 
+                  post_mat2_nonInv_forb_cover$P_site + 
+                  post_mat2_nonInv_shrub_cover$P_site + 
+                  post_mat2_sagebrush_cover$P_site + 
+                  post_mat2_inv_ann_grass_cover$P_site + 
+                  post_mat2_inv_ann_forb_cover$P_site + 
+                  post_mat2_total_foliar_cover$P_site) / 7)
+mean_P_res <- ((post_mat2_nonInv_grass_cover$P_res + 
+                  post_mat2_nonInv_forb_cover$P_res + 
+                  post_mat2_nonInv_shrub_cover$P_res + 
+                  post_mat2_sagebrush_cover$P_res + 
+                  post_mat2_inv_ann_grass_cover$P_res + 
+                  post_mat2_inv_ann_forb_cover$P_res + 
+                  post_mat2_total_foliar_cover$P_res) / 7)
+mean_P_fix <- ((post_mat2_nonInv_grass_cover$P_fix + 
+                  post_mat2_nonInv_forb_cover$P_fix + 
+                  post_mat2_nonInv_shrub_cover$P_fix + 
+                  post_mat2_sagebrush_cover$P_fix + 
+                  post_mat2_inv_ann_grass_cover$P_fix + 
+                  post_mat2_inv_ann_forb_cover$P_fix + 
+                  post_mat2_total_foliar_cover$P_fix) / 7)
+
+
+propPost_BLM <- as.data.frame(cbind(mean_P_rep, mean_P_site, 
+                                    mean_P_res, mean_P_fix))
+```
+
+```{r}
+propPost_BLM %>% 
+  pivot_longer(everything(), values_to = "Variance") %>% 
+  group_by(name) %>%
+  summarise_all(.funs = c(Mean = "mean", sd = "sd"))
+```
+
+
+<br>
+
+***
+
+<br>
+
+
+
 ## PLOTS
 
 ### Bayes model
