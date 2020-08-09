@@ -1978,7 +1978,7 @@ data_BLM %>%
     z_inv_ann_forb_cover = scale(InvAnnForbCover_AH),
     z_total_foliar_cover = scale(TotalFoliarCover_FH)
     ) %>% 
-  select(ProjectName, Replicate, z_soil_stab, z_nonInv_grass_cover,
+  select(ProjectName, PlotID, Replicate, z_soil_stab, z_nonInv_grass_cover,
          z_nonInv_forb_cover, z_nonInv_shrub_cover, z_sagebrush_cover,
          z_inv_ann_grass_cover, z_inv_ann_forb_cover, z_total_foliar_cover) -> sdata_BLM
 
@@ -2018,7 +2018,7 @@ modelb_nonInv_grass_cover <- brm(z_soil_stab ~ z_nonInv_grass_cover +
                         chains = 2, cores = 2) # you can do more but 2 chains will be fine
 
 # Save models
-# saveRDS(modelb_nonInv_grass_cover, "modelb_nonInv_grass_cover.rds")
+saveRDS(modelb_nonInv_grass_cover, "modelb_nonInv_grass_cover.rds")
 
 ```
 
