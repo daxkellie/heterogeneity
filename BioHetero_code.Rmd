@@ -441,6 +441,7 @@ post_mat %>% data.frame %>%
 
 <br>
 
+
 ## Means & SDs
 
 Average variance components across all variables within NutNet data set
@@ -474,6 +475,11 @@ propPost_NutNet %>%
 ```
 
 
+<br>
+
+***
+
+<br>
 
 ## PLOTS
 
@@ -1571,6 +1577,74 @@ post_mat %>%
 ***
 
 <br>
+
+
+## Means & SDs
+
+Average variance components across all variables within NutNet data set
+```{r}
+# finding average proportions of all variables
+mean_P_rep <- ((post_mat2_biomass_Seed$P_rep + 
+                  post_mat2_biomass_Shoot$P_rep + 
+                  post_mat2_biomass_Root$P_rep + 
+                  post_mat2_height_legume$P_rep + 
+                  post_mat2_N.shoot$P_rep + 
+                  post_mat2_C.shoot$P_rep + 
+                  post_mat2_substrate_ET$P_rep + 
+                  post_mat2_litter$P_rep) / 8)
+mean_P_site <- ((post_mat2_biomass_Seed$P_site + 
+                  post_mat2_biomass_Shoot$P_site + 
+                  post_mat2_biomass_Root$P_site + 
+                  post_mat2_height_legume$P_site + 
+                  post_mat2_N.shoot$P_site + 
+                  post_mat2_C.shoot$P_site + 
+                  post_mat2_substrate_ET$P_site + 
+                  post_mat2_litter$P_site) / 8)
+mean_P_CSV <- ((post_mat2_biomass_Seed$P_CSV + 
+                  post_mat2_biomass_Shoot$P_CSV + 
+                  post_mat2_biomass_Root$P_CSV + 
+                  post_mat2_height_legume$P_CSV + 
+                  post_mat2_N.shoot$P_CSV + 
+                  post_mat2_C.shoot$P_CSV + 
+                  post_mat2_substrate_ET$P_CSV + 
+                  post_mat2_litter$P_CSV) / 8)
+mean_P_res <- ((post_mat2_biomass_Seed$P_res + 
+                  post_mat2_biomass_Shoot$P_res + 
+                  post_mat2_biomass_Root$P_res + 
+                  post_mat2_height_legume$P_res + 
+                  post_mat2_N.shoot$P_res + 
+                  post_mat2_C.shoot$P_res + 
+                  post_mat2_substrate_ET$P_res + 
+                  post_mat2_litter$P_res) / 8)
+mean_P_fix <- ((post_mat2_biomass_Seed$P_fix + 
+                  post_mat2_biomass_Shoot$P_fix + 
+                  post_mat2_biomass_Root$P_fix + 
+                  post_mat2_height_legume$P_fix + 
+                  post_mat2_N.shoot$P_fix + 
+                  post_mat2_C.shoot$P_fix + 
+                  post_mat2_substrate_ET$P_fix + 
+                  post_mat2_litter$P_fix) / 8)
+
+
+propPost_CSV <- as.data.frame(cbind(mean_P_rep, mean_P_site, 
+                                    mean_P_CSV, mean_P_res, mean_P_fix))
+```
+
+```{r}
+propPost_CSV %>% 
+  pivot_longer(everything(), values_to = "Variance") %>% 
+  group_by(name) %>%
+  summarise_all(.funs = c(Mean = "mean", sd = "sd"))
+```
+
+
+<br>
+
+***
+
+<br>
+
+
 
 ## PLOTS
 
