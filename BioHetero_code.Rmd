@@ -441,6 +441,40 @@ post_mat %>% data.frame %>%
 
 <br>
 
+## Means & SDs
+
+Average variance components across all variables within NutNet data set
+```{r}
+# finding average proportions of all variables
+mean_P_rep <- ((post_mat2_plant.N$P_rep + 
+                  post_mat2_plant.P$P_rep + 
+                  post_mat2_plant.K$P_rep + 
+                  post_mat2_total.ag.biomass$P_rep) / 4)
+mean_P_site <- ((post_mat2_plant.N$P_site + 
+                   post_mat2_plant.P$P_site + 
+                   post_mat2_plant.K$P_site + 
+                   post_mat2_total.ag.biomass$P_site) / 4)
+mean_P_res <- ((post_mat2_plant.N$P_res + 
+                  post_mat2_plant.P$P_res + 
+                  post_mat2_plant.K$P_res + 
+                  post_mat2_total.ag.biomass$P_res) / 4)
+mean_P_fix <- ((post_mat2_plant.N$P_fix + 
+                  post_mat2_plant.P$P_fix + 
+                  post_mat2_plant.K$P_fix + 
+                  post_mat2_total.ag.biomass$P_fix) / 4)
+
+propPost_NutNet <- as.data.frame(cbind(mean_P_rep, mean_P_site, mean_P_res, mean_P_fix))
+```
+
+```{r}
+propPost_NutNet %>% 
+  pivot_longer(everything(), values_to = "Variance") %>% 
+  group_by(name) %>%
+  summarise_all(.funs = c(Mean = "mean", sd = "sd"))
+```
+
+
+
 ## PLOTS
 
 ### rptR
@@ -507,6 +541,9 @@ varTable_NutNet %>%
 ```
 
 
+
+
+
 ### Bayes model
 
 Create data frame for plotting
@@ -539,34 +576,6 @@ propPost <- as.data.frame(rbind(propPost_plant.N, propPost_plant.P,
 ```
 
 
-```{r}
-# finding average proportions of all variables
-mean_P_rep <- ((post_mat2_plant.N$P_rep + 
-                  post_mat2_plant.P$P_rep + 
-                  post_mat2_plant.K$P_rep + 
-                  post_mat2_total.ag.biomass$P_rep) / 4)
-mean_P_site <- ((post_mat2_plant.N$P_site + 
-                   post_mat2_plant.P$P_site + 
-                   post_mat2_plant.K$P_site + 
-                   post_mat2_total.ag.biomass$P_site) / 4)
-mean_P_res <- ((post_mat2_plant.N$P_res + 
-                  post_mat2_plant.P$P_res + 
-                  post_mat2_plant.K$P_res + 
-                  post_mat2_total.ag.biomass$P_res) / 4)
-mean_P_fix <- ((post_mat2_plant.N$P_fix + 
-                  post_mat2_plant.P$P_fix + 
-                  post_mat2_plant.K$P_fix + 
-                  post_mat2_total.ag.biomass$P_fix) / 4)
-
-propPost_NutNet <- as.data.frame(cbind(mean_P_rep, mean_P_site, mean_P_res, mean_P_fix))
-```
-
-```{r}
-propPost_NutNet %>% 
-  pivot_longer(everything(), values_to = "Variance") %>% 
-  group_by(name) %>%
-  summarise_all(.funs = c(Mean = "mean", sd = "sd"))
-```
 
 
 ```{r}
@@ -738,6 +747,14 @@ library(modelr)
 #   ggplot(aes(x = .prediction, y = R_SITE)) +
 #   stat_slabh()
 ```
+
+
+<br>
+
+***
+
+<br>
+
 
 # (II) CSV (Controlled Systematic Variability)
 Microcosms experiment  
@@ -1830,9 +1847,16 @@ data_BLM <- data_BLM %>%
     ProjectName = as.factor(gsub("([0-9]+).*$", "", ProjectName))
   )
 
+# Limit to only most recent year
+range(data_BLM$Year)
+
+data_BLM <- data_BLM %>% filter(Year == 2017)
+data_BLM
+levels(data_BLM$ProjectName)
 
 # Create replicate variable
-data_BLM$Replicate <- paste0(data_BLM$ProjectName, data_BLM$Year)
+#   Plots within each project (combined to avoid accidental duplicates across projects)
+data_BLM$Replicate <- paste0(data_BLM$ProjectName, data_BLM$PlotID)
 ```
 
 
