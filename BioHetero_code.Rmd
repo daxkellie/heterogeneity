@@ -1940,11 +1940,6 @@ data_BLM$Replicate <- paste0(data_BLM$ProjectName, data_BLM$PlotID)
 data_BLM %>% 
   group_by(as.factor(ProjectName)) %>%
   summarise(no_rows = length(as.factor(ProjectName)))
-
-# How many in PlotKey?
-data_BLM %>% 
-  group_by(as.factor(PlotID)) %>%
-  summarise(no_rows = length(as.factor(PlotID)))
 ```
 
 
@@ -2006,10 +2001,12 @@ summary(model)
 hist(resid(model)) # Looks great
 
 # random intercept model
-model0 <- lmer(z_soil_stab ~ z_nonInv_grass_cover + (1 |PlotKey), 
+model0 <- lmer(z_soil_stab ~ z_nonInv_grass_cover + (1 |ProjectName), 
                data = sdata_BLM)
 summary(model0)
 hist(resid(model0)) 
+
+# difference between random slope and random intercept model is pretty much negligible, but every so slightly more variance is attributed to the random slope variable
 ```
 
 
@@ -2019,7 +2016,7 @@ Check model residuals
 ```{r}
 # random slope model (using lmer)
 model <- lmer(z_soil_stab ~ z_nonInv_grass_cover + 
-                (1 + z_nonInv_grass_cover|ProjectName) + (1 | Replicate), 
+                (1 + z_nonInv_grass_cover|ProjectName), 
               data = sdata_BLM)
 summary(model)
 hist(resid(model)) # Looks great
@@ -2028,7 +2025,7 @@ hist(resid(model)) # Looks great
 Bayesian model
 ```{r, eval = FALSE}
 modelb_nonInv_grass_cover <- brm(z_soil_stab ~ z_nonInv_grass_cover +
-                          (1 + z_nonInv_grass_cover|ProjectName) + (1 | Replicate),
+                          (1 + z_nonInv_grass_cover|ProjectName),
                         data = sdata_BLM,
                         chains = 2, cores = 2) # you can do more but 2 chains will be fine
 
@@ -2049,7 +2046,7 @@ post <- posterior_samples(modelb_nonInv_grass_cover)
 # names(post)
 
 # we get what we need - for random effect
-V_rep <-post$sd_Replicate__Intercept^2 # making it variance
+# V_rep <-post$sd_Replicate__Intercept^2 # making it variance
 V_site <-post$sd_ProjectName__Intercept^2 + post$sd_ProjectName__z_nonInv_grass_cover^2
 V_res <- post$sigma^2 
 ```
@@ -2065,7 +2062,7 @@ post_fix <- as.data.frame(t(post[,1:2]))
 V_fix <-  map_dbl(post_fix, ~ var(as.vector(. %*% t(model@pp$X))) )
 
 # mcmc object (from coda package)
-post_mat <- as.mcmc(data.frame(V_rep, V_site, V_res, V_fix, row.names = NULL))
+post_mat <- as.mcmc(data.frame(V_site, V_res, V_fix, row.names = NULL))
 
 summary(post_mat)
 plot(post_mat)
@@ -2073,12 +2070,12 @@ plot(post_mat)
 # Calculate proportions from posterior
 post_mat %>% 
   data.frame %>% 
-  mutate(V_all = V_rep + V_site + V_res + V_fix,
-         P_rep = V_rep/(V_rep + V_site + V_res + V_fix),
-         P_site = V_site/(V_rep + V_site + V_res + V_fix),
-         P_res = V_res/(V_rep + V_site + V_res + V_fix),
-         P_fix = V_fix/(V_rep + V_site + V_res + V_fix),
-         P_all = P_rep + P_site + P_res + P_fix)          ->  post_mat2_nonInv_grass_cover
+  mutate(V_all = V_site + V_res + V_fix,
+         # P_rep = V_rep/(V_rep + V_site + V_res + V_fix),
+         P_site = V_site/(V_site + V_res + V_fix),
+         P_res = V_res/(V_site + V_res + V_fix),
+         P_fix = V_fix/(V_site + V_res + V_fix),
+         P_all = P_site + P_res + P_fix)          ->  post_mat2_nonInv_grass_cover
 
 ```
 
@@ -2092,7 +2089,7 @@ Check model residuals
 ```{r}
 # random slope model (using lmer)
 model <- lmer(z_soil_stab ~ z_nonInv_forb_cover + 
-                (1 + z_nonInv_forb_cover|ProjectName) + (1 | Replicate), 
+                (1 + z_nonInv_forb_cover|ProjectName), 
               data = sdata_BLM)
 summary(model)
 hist(resid(model)) # Looks great
@@ -2101,13 +2098,13 @@ hist(resid(model)) # Looks great
 
 Bayesian model
 ```{r}
-# modelb_nonInv_forb_cover <- brm(z_soil_stab ~ z_nonInv_forb_cover +
-#                           (1 + z_nonInv_forb_cover|ProjectName) + (1 | Replicate),
-#                         data = sdata_BLM,
-#                         chains = 2, cores = 2) # you can do more but 2 chains will be fine
+modelb_nonInv_forb_cover <- brm(z_soil_stab ~ z_nonInv_forb_cover +
+                          (1 + z_nonInv_forb_cover|ProjectName),
+                        data = sdata_BLM,
+                        chains = 2, cores = 2) # you can do more but 2 chains will be fine
 
 # Save models
-# saveRDS(modelb_nonInv_forb_cover, "modelb_nonInv_forb_cover.rds")
+saveRDS(modelb_nonInv_forb_cover, "modelb_nonInv_forb_cover.rds")
 
 ```
 
@@ -2123,7 +2120,7 @@ post <- posterior_samples(modelb_nonInv_forb_cover)
 # names(post)
 
 # we get what we need - for random effect
-V_rep <-post$sd_Replicate__Intercept^2 # making it variance
+# V_rep <-post$sd_Replicate__Intercept^2 # making it variance
 V_site <-post$sd_ProjectName__Intercept^2 + post$sd_ProjectName__z_nonInv_forb_cover^2
 V_res <- post$sigma^2 
 ```
@@ -2139,7 +2136,7 @@ post_fix <- as.data.frame(t(post[,1:2]))
 V_fix <-  map_dbl(post_fix, ~ var(as.vector(. %*% t(model@pp$X))) )
 
 # mcmc object (from coda package)
-post_mat <- as.mcmc(data.frame(V_rep, V_site, V_res, V_fix, row.names = NULL))
+post_mat <- as.mcmc(data.frame(V_site, V_res, V_fix, row.names = NULL))
 
 summary(post_mat)
 plot(post_mat)
@@ -2147,12 +2144,12 @@ plot(post_mat)
 # Calculate proportions from posterior
 post_mat %>% 
   data.frame %>% 
-  mutate(V_all = V_rep + V_site + V_res + V_fix,
-         P_rep = V_rep/(V_rep + V_site + V_res + V_fix),
-         P_site = V_site/(V_rep + V_site + V_res + V_fix),
-         P_res = V_res/(V_rep + V_site + V_res + V_fix),
-         P_fix = V_fix/(V_rep + V_site + V_res + V_fix),
-         P_all = P_rep + P_site + P_res + P_fix)          ->  post_mat2_nonInv_forb_cover
+  mutate(V_all = V_site + V_res + V_fix,
+         # P_rep = V_rep/(V_site + V_res + V_fix),
+         P_site = V_site/(V_site + V_res + V_fix),
+         P_res = V_res/(V_site + V_res + V_fix),
+         P_fix = V_fix/(V_site + V_res + V_fix),
+         P_all = P_site + P_res + P_fix)          ->  post_mat2_nonInv_forb_cover
 
 ```
 
@@ -2166,7 +2163,7 @@ Check model residuals
 ```{r}
 # random slope model (using lmer)
 model <- lmer(z_soil_stab ~ z_nonInv_shrub_cover + 
-                (1 + z_nonInv_shrub_cover|ProjectName) + (1 | Replicate), 
+                (1 + z_nonInv_shrub_cover|ProjectName), 
               data = sdata_BLM)
 summary(model)
 hist(resid(model)) # Looks great
@@ -2175,13 +2172,13 @@ hist(resid(model)) # Looks great
 
 Bayesian model
 ```{r, eval = FALSE}
-# modelb_nonInv_shrub_cover <- brm(z_soil_stab ~ z_nonInv_shrub_cover +
-#                           (1 + z_nonInv_shrub_cover|ProjectName) + (1 | Replicate),
-#                         data = sdata_BLM,
-#                         chains = 2, cores = 2) # you can do more but 2 chains will be fine
+modelb_nonInv_shrub_cover <- brm(z_soil_stab ~ z_nonInv_shrub_cover +
+                          (1 + z_nonInv_shrub_cover|ProjectName),
+                        data = sdata_BLM,
+                        chains = 2, cores = 2) # you can do more but 2 chains will be fine
 
 # Save models
-# saveRDS(modelb_nonInv_shrub_cover, "modelb_nonInv_shrub_cover.rds")
+saveRDS(modelb_nonInv_shrub_cover, "modelb_nonInv_shrub_cover.rds")
 
 ```
 
@@ -2197,7 +2194,7 @@ post <- posterior_samples(modelb_nonInv_shrub_cover)
 # names(post)
 
 # we get what we need - for random effect
-V_rep <-post$sd_Replicate__Intercept^2 # making it variance
+# V_rep <-post$sd_Replicate__Intercept^2 # making it variance
 V_site <-post$sd_ProjectName__Intercept^2 + post$sd_ProjectName__z_nonInv_shrub_cover^2
 V_res <- post$sigma^2 
 ```
@@ -2213,7 +2210,7 @@ post_fix <- as.data.frame(t(post[,1:2]))
 V_fix <-  map_dbl(post_fix, ~ var(as.vector(. %*% t(model@pp$X))) )
 
 # mcmc object (from coda package)
-post_mat <- as.mcmc(data.frame(V_rep, V_site, V_res, V_fix, row.names = NULL))
+post_mat <- as.mcmc(data.frame(V_site, V_res, V_fix, row.names = NULL))
 
 summary(post_mat)
 plot(post_mat)
@@ -2221,12 +2218,12 @@ plot(post_mat)
 # Calculate proportions from posterior
 post_mat %>% 
   data.frame %>% 
-  mutate(V_all = V_rep + V_site + V_res + V_fix,
-         P_rep = V_rep/(V_rep + V_site + V_res + V_fix),
-         P_site = V_site/(V_rep + V_site + V_res + V_fix),
-         P_res = V_res/(V_rep + V_site + V_res + V_fix),
-         P_fix = V_fix/(V_rep + V_site + V_res + V_fix),
-         P_all = P_rep + P_site + P_res + P_fix)          ->  post_mat2_nonInv_shrub_cover
+  mutate(V_all = V_site + V_res + V_fix,
+         # P_rep = V_rep/(V_rep + V_site + V_res + V_fix),
+         P_site = V_site/(V_site + V_res + V_fix),
+         P_res = V_res/(V_site + V_res + V_fix),
+         P_fix = V_fix/(V_site + V_res + V_fix),
+         P_all = P_site + P_res + P_fix)          ->  post_mat2_nonInv_shrub_cover
 
 ```
 
@@ -2242,7 +2239,7 @@ Check model residuals
 ```{r}
 # random slope model (using lmer)
 model <- lmer(z_soil_stab ~ z_sagebrush_cover + 
-                (1 + z_sagebrush_cover|ProjectName) + (1 | Replicate), 
+                (1 + z_sagebrush_cover|ProjectName), 
               data = sdata_BLM)
 summary(model)
 hist(resid(model)) # Looks great
@@ -2251,13 +2248,13 @@ hist(resid(model)) # Looks great
 
 Bayesian model
 ```{r, eval = FALSE}
-# modelb_sagebrush_cover <- brm(z_soil_stab ~ z_sagebrush_cover +
-#                           (1 + z_sagebrush_cover|ProjectName) + (1 | Replicate),
-#                         data = sdata_BLM,
-#                         chains = 2, cores = 2) # you can do more but 2 chains will be fine
+modelb_sagebrush_cover <- brm(z_soil_stab ~ z_sagebrush_cover +
+                          (1 + z_sagebrush_cover|ProjectName),
+                        data = sdata_BLM,
+                        chains = 2, cores = 2) # you can do more but 2 chains will be fine
 
 # Save models
-# saveRDS(modelb_sagebrush_cover, "modelb_sagebrush_cover.rds")
+saveRDS(modelb_sagebrush_cover, "modelb_sagebrush_cover.rds")
 
 ```
 
@@ -2272,7 +2269,7 @@ post <- posterior_samples(modelb_sagebrush_cover)
 # names(post)
 
 # we get what we need - for random effect
-V_rep <-post$sd_Replicate__Intercept^2 # making it variance
+# V_rep <-post$sd_Replicate__Intercept^2 # making it variance
 V_site <-post$sd_ProjectName__Intercept^2 + post$sd_ProjectName__z_sagebrush_cover^2
 V_res <- post$sigma^2 
 ```
@@ -2288,7 +2285,7 @@ post_fix <- as.data.frame(t(post[,1:2]))
 V_fix <-  map_dbl(post_fix, ~ var(as.vector(. %*% t(model@pp$X))) )
 
 # mcmc object (from coda package)
-post_mat <- as.mcmc(data.frame(V_rep, V_site, V_res, V_fix, row.names = NULL))
+post_mat <- as.mcmc(data.frame(V_site, V_res, V_fix, row.names = NULL))
 
 summary(post_mat)
 plot(post_mat)  # This model has a bit of difficulty
@@ -2296,12 +2293,11 @@ plot(post_mat)  # This model has a bit of difficulty
 # Calculate proportions from posterior
 post_mat %>% 
   data.frame %>% 
-  mutate(V_all = V_rep + V_site + V_res + V_fix,
-         P_rep = V_rep/(V_rep + V_site + V_res + V_fix),
-         P_site = V_site/(V_rep + V_site + V_res + V_fix),
-         P_res = V_res/(V_rep + V_site + V_res + V_fix),
-         P_fix = V_fix/(V_rep + V_site + V_res + V_fix),
-         P_all = P_rep + P_site + P_res + P_fix)          ->  post_mat2_sagebrush_cover
+  mutate(V_all = V_site + V_res + V_fix,
+         P_site = V_site/(V_site + V_res + V_fix),
+         P_res = V_res/(V_site + V_res + V_fix),
+         P_fix = V_fix/(V_site + V_res + V_fix),
+         P_all = P_site + P_res + P_fix)          ->  post_mat2_sagebrush_cover
 
 ```
 
@@ -2317,7 +2313,7 @@ Check model residuals
 ```{r}
 # random slope model (using lmer)
 model <- lmer(z_soil_stab ~ z_inv_ann_grass_cover + 
-                (1 + z_inv_ann_grass_cover|ProjectName) + (1 | Replicate), 
+                (1 + z_inv_ann_grass_cover|ProjectName), 
               data = sdata_BLM)
 summary(model)
 hist(resid(model)) # Looks great
@@ -2326,13 +2322,13 @@ hist(resid(model)) # Looks great
 
 Bayesian model
 ```{r}
-# modelb_inv_ann_grass_cover <- brm(z_soil_stab ~ z_inv_ann_grass_cover +
-#                           (1 + z_inv_ann_grass_cover|ProjectName) + (1 | Replicate),
-#                         data = sdata_BLM,
-#                         chains = 2, cores = 2) # you can do more but 2 chains will be fine
+modelb_inv_ann_grass_cover <- brm(z_soil_stab ~ z_inv_ann_grass_cover +
+                          (1 + z_inv_ann_grass_cover|ProjectName),
+                        data = sdata_BLM,
+                        chains = 2, cores = 2) # you can do more but 2 chains will be fine
 
 # Save models
-# saveRDS(modelb_inv_ann_grass_cover, "modelb_inv_ann_grass_cover.rds")
+saveRDS(modelb_inv_ann_grass_cover, "modelb_inv_ann_grass_cover.rds")
 
 ```
 
@@ -2347,7 +2343,6 @@ post <- posterior_samples(modelb_inv_ann_grass_cover)
 # names(post)
 
 # we get what we need - for random effect
-V_rep <-post$sd_Replicate__Intercept^2 # making it variance
 V_site <-post$sd_ProjectName__Intercept^2 + post$sd_ProjectName__z_inv_ann_grass_cover^2
 V_res <- post$sigma^2 
 ```
@@ -2363,7 +2358,7 @@ post_fix <- as.data.frame(t(post[,1:2]))
 V_fix <-  map_dbl(post_fix, ~ var(as.vector(. %*% t(model@pp$X))) )
 
 # mcmc object (from coda package)
-post_mat <- as.mcmc(data.frame(V_rep, V_site, V_res, V_fix, row.names = NULL))
+post_mat <- as.mcmc(data.frame(V_site, V_res, V_fix, row.names = NULL))
 
 summary(post_mat)
 plot(post_mat)
@@ -2371,12 +2366,11 @@ plot(post_mat)
 # Calculate proportions from posterior
 post_mat %>% 
   data.frame %>% 
-  mutate(V_all = V_rep + V_site + V_res + V_fix,
-         P_rep = V_rep/(V_rep + V_site + V_res + V_fix),
-         P_site = V_site/(V_rep + V_site + V_res + V_fix),
-         P_res = V_res/(V_rep + V_site + V_res + V_fix),
-         P_fix = V_fix/(V_rep + V_site + V_res + V_fix),
-         P_all = P_rep + P_site + P_res + P_fix)          ->  post_mat2_inv_ann_grass_cover
+  mutate(V_all = V_site + V_res + V_fix,
+         P_site = V_site/(V_site + V_res + V_fix),
+         P_res = V_res/(V_site + V_res + V_fix),
+         P_fix = V_fix/(V_site + V_res + V_fix),
+         P_all = P_site + P_res + P_fix)          ->  post_mat2_inv_ann_grass_cover
 
 ```
 
@@ -2393,7 +2387,7 @@ Check model residuals
 ```{r}
 # random slope model (using lmer)
 model <- lmer(z_soil_stab ~ z_inv_ann_forb_cover + 
-                (1 + z_inv_ann_forb_cover|ProjectName) + (1 | Replicate), 
+                (1 + z_inv_ann_forb_cover|ProjectName), 
               data = sdata_BLM)
 summary(model)
 hist(resid(model)) # Looks great
@@ -2402,13 +2396,13 @@ hist(resid(model)) # Looks great
 
 Bayesian model
 ```{r, eval = FALSE}
-# modelb_inv_ann_forb_cover <- brm(z_soil_stab ~ z_inv_ann_forb_cover +
-#                           (1 + z_inv_ann_forb_cover|ProjectName) + (1 | Replicate),
-#                         data = sdata_BLM,
-#                         chains = 2, cores = 2) # you can do more but 2 chains will be fine
+modelb_inv_ann_forb_cover <- brm(z_soil_stab ~ z_inv_ann_forb_cover +
+                          (1 + z_inv_ann_forb_cover|ProjectName),
+                        data = sdata_BLM,
+                        chains = 2, cores = 2) # you can do more but 2 chains will be fine
 
 # Save models
-# saveRDS(modelb_inv_ann_forb_cover, "modelb_inv_ann_forb_cover.rds")
+saveRDS(modelb_inv_ann_forb_cover, "modelb_inv_ann_forb_cover.rds")
 
 ```
 
@@ -2423,7 +2417,6 @@ post <- posterior_samples(modelb_inv_ann_forb_cover)
 # names(post)
 
 # we get what we need - for random effect
-V_rep <-post$sd_Replicate__Intercept^2 # making it variance
 V_site <-post$sd_ProjectName__Intercept^2 + post$sd_ProjectName__z_inv_ann_forb_cover^2
 V_res <- post$sigma^2 
 ```
@@ -2439,7 +2432,7 @@ post_fix <- as.data.frame(t(post[,1:2]))
 V_fix <-  map_dbl(post_fix, ~ var(as.vector(. %*% t(model@pp$X))) )
 
 # mcmc object (from coda package)
-post_mat <- as.mcmc(data.frame(V_rep, V_site, V_res, V_fix, row.names = NULL))
+post_mat <- as.mcmc(data.frame(V_site, V_res, V_fix, row.names = NULL))
 
 summary(post_mat)
 plot(post_mat) # Some huge tails on these estimates, likely due to small fixed effects
@@ -2447,12 +2440,11 @@ plot(post_mat) # Some huge tails on these estimates, likely due to small fixed e
 # Calculate proportions from posterior
 post_mat %>% 
   data.frame %>% 
-  mutate(V_all = V_rep + V_site + V_res + V_fix,
-         P_rep = V_rep/(V_rep + V_site + V_res + V_fix),
-         P_site = V_site/(V_rep + V_site + V_res + V_fix),
-         P_res = V_res/(V_rep + V_site + V_res + V_fix),
-         P_fix = V_fix/(V_rep + V_site + V_res + V_fix),
-         P_all = P_rep + P_site + P_res + P_fix)          ->  post_mat2_inv_ann_forb_cover
+  mutate(V_all = V_site + V_res + V_fix,
+         P_site = V_site/(V_site + V_res + V_fix),
+         P_res = V_res/(V_site + V_res + V_fix),
+         P_fix = V_fix/(V_site + V_res + V_fix),
+         P_all = P_site + P_res + P_fix)          ->  post_mat2_inv_ann_forb_cover
 
 ```
 
@@ -2466,7 +2458,7 @@ Check model residuals
 ```{r}
 # random slope model (using lmer)
 model <- lmer(z_soil_stab ~ z_total_foliar_cover + 
-                (1 + z_total_foliar_cover|ProjectName) + (1 | Replicate), 
+                (1 + z_total_foliar_cover|ProjectName), 
               data = sdata_BLM)
 summary(model)
 hist(resid(model)) # Looks great
@@ -2476,12 +2468,12 @@ hist(resid(model)) # Looks great
 Bayesian model
 ```{r, eval = FALSE}
 modelb_total_foliar_cover <- brm(z_soil_stab ~ z_total_foliar_cover +
-                          (1 + z_total_foliar_cover|ProjectName) + (1 | Replicate),
+                          (1 + z_total_foliar_cover|ProjectName),
                         data = sdata_BLM,
                         chains = 2, cores = 2) # you can do more but 2 chains will be fine
 
 # Save models
-# saveRDS(modelb_total_foliar_cover, "modelb_total_foliar_cover.rds")
+saveRDS(modelb_total_foliar_cover, "modelb_total_foliar_cover.rds")
 
 ```
 
@@ -2496,7 +2488,6 @@ post <- posterior_samples(modelb_total_foliar_cover)
 # names(post)
 
 # we get what we need - for random effect
-V_rep <-post$sd_Replicate__Intercept^2 # making it variance
 V_site <-post$sd_ProjectName__Intercept^2 + post$sd_ProjectName__z_total_foliar_cover^2
 V_res <- post$sigma^2 
 ```
@@ -2512,7 +2503,7 @@ post_fix <- as.data.frame(t(post[,1:2]))
 V_fix <-  map_dbl(post_fix, ~ var(as.vector(. %*% t(model@pp$X))) )
 
 # mcmc object (from coda package)
-post_mat <- as.mcmc(data.frame(V_rep, V_site, V_res, V_fix, row.names = NULL))
+post_mat <- as.mcmc(data.frame(V_site, V_res, V_fix, row.names = NULL))
 
 summary(post_mat)
 plot(post_mat)
@@ -2520,12 +2511,11 @@ plot(post_mat)
 # Calculate proportions from posterior
 post_mat %>% 
   data.frame %>% 
-  mutate(V_all = V_rep + V_site + V_res + V_fix,
-         P_rep = V_rep/(V_rep + V_site + V_res + V_fix),
-         P_site = V_site/(V_rep + V_site + V_res + V_fix),
-         P_res = V_res/(V_rep + V_site + V_res + V_fix),
-         P_fix = V_fix/(V_rep + V_site + V_res + V_fix),
-         P_all = P_rep + P_site + P_res + P_fix)          ->  post_mat2_total_foliar_cover
+  mutate(V_all = V_site + V_res + V_fix,
+         P_site = V_site/(V_site + V_res + V_fix),
+         P_res = V_res/(V_site + V_res + V_fix),
+         P_fix = V_fix/(V_site + V_res + V_fix),
+         P_all = P_site + P_res + P_fix)          ->  post_mat2_total_foliar_cover
 
 ```
 
@@ -2548,13 +2538,6 @@ Not sure if this needs to be added (though my intuitions tell me probably not)
 Average variance components across all variables within NutNet data set
 ```{r}
 # finding average proportions of all variables
-mean_P_rep <- ((post_mat2_nonInv_grass_cover$P_rep + 
-                  post_mat2_nonInv_forb_cover$P_rep + 
-                  post_mat2_nonInv_shrub_cover$P_rep + 
-                  post_mat2_sagebrush_cover$P_rep + 
-                  post_mat2_inv_ann_grass_cover$P_rep + 
-                  post_mat2_inv_ann_forb_cover$P_rep + 
-                  post_mat2_total_foliar_cover$P_rep) / 7)
 mean_P_site <- ((post_mat2_nonInv_grass_cover$P_site + 
                   post_mat2_nonInv_forb_cover$P_site + 
                   post_mat2_nonInv_shrub_cover$P_site + 
@@ -2578,7 +2561,7 @@ mean_P_fix <- ((post_mat2_nonInv_grass_cover$P_fix +
                   post_mat2_total_foliar_cover$P_fix) / 7)
 
 
-propPost_BLM <- as.data.frame(cbind(mean_P_rep, mean_P_site, 
+propPost_BLM <- as.data.frame(cbind(mean_P_site, 
                                     mean_P_res, mean_P_fix))
 ```
 
@@ -2614,7 +2597,7 @@ create_bayesVarTable <- function(posteriorVarianceDF, variableName) {
     iteration = 1:length(posteriorVarianceDF$P_all), # make a col to represent each test
     Variable = as.factor(paste(variableName))         # add Variable name
   ) %>%
-  select(P_rep, P_site, P_res, P_fix, iteration, Variable) %>%
+  select(P_site, P_res, P_fix, iteration, Variable) %>%
   pivot_longer(c(-Variable, -iteration), values_to = "Variance") # flip the table
 }
 
@@ -2635,16 +2618,6 @@ propPost_BLM <- as.data.frame(rbind(propPost_nonInv_grass_cover, propPost_nonInv
 ```
 
 
-```{r, eval = FALSE}
-# finding average proportions of all variables
-mean_P_rep <- ((post_mat2_plant.N$P_rep + post_mat2_plant.P$P_rep + post_mat2_plant.K$P_rep)/3)
-mean_P_site <- ((post_mat2_plant.N$P_site + post_mat2_plant.P$P_site + post_mat2_plant.K$P_site)/3)
-mean_P_res <- ((post_mat2_plant.N$P_res + post_mat2_plant.P$P_res + post_mat2_plant.K$P_res)/3)
-mean_P_fix <- ((post_mat2_plant.N$P_fix + post_mat2_plant.P$P_fix + post_mat2_plant.K$P_fix)/3)
-
-propPost_NutNet <- as.data.frame(cbind(mean_P_rep, mean_P_site, mean_P_res, mean_P_fix))
-```
-
 
 ```{r}
 # Rename variables for plotting
@@ -2652,7 +2625,6 @@ propPost_BLM <- propPost_BLM %>%
     mutate(
     name = as.factor(recode(name,
                         "P_fix" = "Fixed",
-                        "P_rep" = "Replicate",
                         "P_res" = "Residual",
                         "P_site" = "Location")),
     Variable = as.factor(recode(Variable,
@@ -2665,7 +2637,7 @@ propPost_BLM <- propPost_BLM %>%
                                 "sagebrush_cover" = "Sagebrush Cover"))
   ) %>%
        arrange_at(4, desc) %>%
-     arrange(match(name, c("Location", "Residual", "Replicate", "Fixed")))
+     arrange(match(name, c("Location", "Residual", "Fixed")))
 
 # calculate mean & SE values
 propPost_BLM.sem <-
@@ -2679,7 +2651,7 @@ propPost_BLM.sem <-
 # rearrange order of variables
 propPost_BLM.sem <- propPost_BLM.sem %>%
      arrange_at(4, desc) %>%
-     arrange(match(name, c("Location", "Residual", "Replicate", "Fixed")))
+     arrange(match(name, c("Location", "Residual", "Fixed")))
 
 propPost_BLM.sem
 
@@ -2694,7 +2666,7 @@ Stacked Bar Plot
 ```{r}
 plot1_BLM <- 
   propPost_BLM.sem2 %>% mutate(
-    Component = factor(name, levels=c("Fixed", "Replicate", "Residual", "Location"))) %>% 
+    Component = factor(name, levels=c("Fixed", "Residual", "Location"))) %>% 
   
   ggplot(aes(x = Variable, 
              y = mean, 
@@ -2715,7 +2687,7 @@ plot1_BLM <-
 Side-by-side bar plots of individual variance components
 ```{r}
 plot2_BLM <- propPost_BLM %>% mutate(
-  name = factor(name, levels=c("Fixed", "Replicate", "Residual", "Location"))) %>% 
+  name = factor(name, levels=c("Fixed", "Residual", "Location"))) %>% 
   
   ggplot(aes(x = Variable, y = Variance, fill = name, colour = name)) + 
   facet_grid(rows = vars(name)) +
