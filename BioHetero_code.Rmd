@@ -677,6 +677,14 @@ library(patchwork)
 plot + plot2 + plot_layout(widths = c(2, 1))
 ```
 
+```{r, eval = FALSE, echo = FALSE}
+ggsave("plot_NutNet.tiff",
+ plot = last_plot(), # or give ggplot object name as in myPlot,
+ width = 7, height = 5,
+ units = "in", # other options c("in", "cm", "mm"),
+ dpi = 600)
+```
+
 <br>
 
 ***
@@ -1857,6 +1865,14 @@ plot1_CSV + plot2_CSV + plot_layout(widths = c(2, 1))
 CSV: Controlled Systematic Variance  
 Location: (N = 14)  
 
+```{r, eval = FALSE, echo = FALSE}
+ggsave("plot_CSV.tiff",
+ plot = last_plot(), # or give ggplot object name as in myPlot,
+ width = 8, height = 6,
+ units = "in", # other options c("in", "cm", "mm"),
+ dpi = 600)
+```
+
 <br>
 
 ***
@@ -2097,7 +2113,7 @@ hist(resid(model)) # Looks great
 
 
 Bayesian model
-```{r}
+```{r, eval = F}
 modelb_nonInv_forb_cover <- brm(z_soil_stab ~ z_nonInv_forb_cover +
                           (1 + z_nonInv_forb_cover|ProjectName),
                         data = sdata_BLM,
@@ -2321,7 +2337,7 @@ hist(resid(model)) # Looks great
 
 
 Bayesian model
-```{r}
+```{r, eval = FALSE}
 modelb_inv_ann_grass_cover <- brm(z_soil_stab ~ z_inv_ann_grass_cover +
                           (1 + z_inv_ann_grass_cover|ProjectName),
                         data = sdata_BLM,
@@ -2711,6 +2727,14 @@ library(patchwork)
 plot1_BLM + plot2_BLM + plot_layout(widths = c(2, 1))
 ```
 
+
+```{r, eval = FALSE, echo = FALSE}
+ggsave("plot_BLM.tiff",
+ plot = last_plot(), # or give ggplot object name as in myPlot,
+ width = 8, height = 5,
+ units = "in", # other options c("in", "cm", "mm"),
+ dpi = 600)
+```
 
 
 ## Site Locations
