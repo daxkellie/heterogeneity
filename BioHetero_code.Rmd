@@ -1837,14 +1837,18 @@ plot1_CSV <-
 
 Side-by-side bar plots of individual variance components
 ```{r}
+library(Hmisc)
 plot2_CSV <- propPost_CSV %>% mutate(
   name = factor(name, levels=c("Fixed", "CSV", "Replicate", "Residual", "Location"))) %>% 
   
   ggplot(aes(x = Variable, y = Variance, fill = name, colour = name)) + 
   facet_grid(rows = vars(name)) +
   stat_summary(fun.y = mean, geom = "bar", position = "dodge",width = 1, alpha = .8) +
-  stat_summary(fun.data = mean_cl_normal, geom = "errorbar", 
-               width = 0.15, position = position_dodge(width = 0.90), colour = "black") +
+  stat_summary(fun.y = mean, 
+               fun.ymin = function(x) mean(x) - sd(x), 
+               fun.ymax = function(x) mean(x) + sd(x),
+               geom = "errorbar",
+               width = 0.00, position = position_dodge(width = 0.90), colour = "black") +
   scale_y_continuous(labels = scales::percent) +
   labs(x = "Outcome Variables",
        y = "Proportion of Total Variance") +
