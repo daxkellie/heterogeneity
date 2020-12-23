@@ -1,0 +1,2831 @@
+---
+title: "Biological Heterogeneity"
+author: "DK"
+date: "01/04/2020"
+output:
+  html_document:
+    highlight: pygments
+    theme: lumen
+    toc: yes
+    toc_float: yes
+editor_options: 
+  chunk_output_type: inline
+---
+
+```{r fresh list of bel air, echo = FALSE}
+rm(list=ls())
+```
+
+```{r packages, message = FALSE, warning = FALSE, error = FALSE}
+pacman::p_load(tidyverse, lme4, lmerTest, MuMIn, rstan, brms, rptR, tidybayes, coda,
+               sf, "rnaturalearth", "rnaturalearthdata", modelr, ggthemes, ggmcmc, MCMCglmm, metafor)
+
+# helping running rstan (brms) models
+
+options(mc.cores = parallel::detectCores())
+rstan_options(auto_write = TRUE)
+```
+
+
+# Load Data Sets
+
+```{r}
+data_CSV <- read.csv("Datasets/CSV_microcosms/data/milcu_etal2017.csv", header = TRUE)
+data_NutNet <- read.csv("Datasets/NutNet/data/Model2.SEM.plot.data.csv", header = TRUE)
+data_biomass <- read.csv("Datasets/RichnessDrought/data/biomass_1.2.csv", header = TRUE)
+data_BLM <- read.csv("Datasets/BLM/terradat_points_table.csv")
+```
+
+
+# (I) NutNet (Nutrient Network)
+Anderson et al. (2018) model </br>
+
+Tests effect of Herbivory (FENCE; yes/no) & Eutrophication (Fertilizer; yes/no) on C, N, P & K
+
+Model includes treatment variable Fence, as well as environmental measures of MAP, MAT and SOLAR.INS  
+MAP = mean annual precipitation  
+MAT = mean annual temperature  
+SOLAR.INS = solar insolation  
+
+Used AIC model comparison to determine final model
+
+```{r}
+data_NutNet %>% glimpse()
+data_NutNet %>% head(5)
+```
+
+
+Frequency Distributions
+```{r}
+plot_frequencyDist <- function(df, variable) {
+  
+  fd.histogram <- ggplot(df, aes_string(x = variable)) + 
+    guides(fill = F) # to remove the legend
+  
+  fd.histogram + 
+    geom_histogram(binwidth = .4) + # binwidth tidies the data a bit
+    labs(x = variable, y = "Frequency")
+  
+}
+
+plot_frequencyDist(data_NutNet, "plant.N")
+plot_frequencyDist(data_NutNet, "plant.P")
+plot_frequencyDist(data_NutNet, "plant.K")
+plot_frequencyDist(data_NutNet, "TOTAL.AG.BIOMASS")
+```
+
+## Analysis
+create `REPLICATE` variable for analysis
+```{r}
+# create REPLICATE variable for analysis
+data_NutNet$REPLICATE <- paste0(data_NutNet$SITE, data_NutNet$TREATMENT)
+```
+
+
+
+
+### Plant N
+
+Frequentist model
+```{r}
+# plant N
+model <- lmer(log(plant.N) ~ TREATMENT-1 + (1|SITE) + (1|REPLICATE), data = data_NutNet)
+summary(model)
+#hist(resid(model)) # Note that there is an outlier
+
+# Total Variance
+var(data_NutNet$plant.N)
+
+#########
+data_NutNet$vi <- 1
+res <- rma.mv(yi = log(plant.N), V = 1, mods ~ 0 + TREATMENT, random = list(~ TREATMENT | SITE,  ~ 1 | REPLICATE), data = data_NutNet)
+summary(res)
+
+```
+
+Variance Estimation (using rptR)
+```{r}
+# Plant N
+rep_plant.N <- rptGaussian(plant.N ~ TREATMENT + (1|SITE),
+                 grname = c("SITE", "Fixed", "Residual"), 
+                 data = data_NutNet,
+                 ratio = FALSE,
+                 nboot = 100, parallel = TRUE, adjusted = FALSE)
+
+rep_plant.N
+```
+
+Bayesian model
+```{r}
+# N
+# modelb_plant.N <- brm(plant.N ~ TREATMENT + (1|SITE) + (1|REPLICATE), 
+#                         data = data_NutNet,
+#                         chains = 2, cores = 2)
+
+# Save model
+# saveRDS(modelb_plant.N, "model_plantN.rds")
+```
+
+```{r}
+# Load model
+modelb_plant.N <- readRDS("model_plantN.rds")
+
+# bayesian R2 estimate of regression model
+bayes_R2(modelb_plant.N)
+```
+
+
+```{r}
+# getting posterior of random effects for each
+# blups <- ranef(modelb, summary = F) # WHAT IS THIS DO I NEED IT
+
+# get all posterior samples
+post <- posterior_samples(modelb_plant.N)
+names(post)
+
+# these three are important
+# [1] "b_Intercept"                                  "b_TREATMENTFence"                            
+#  [3] "b_TREATMENTNPK"                               "b_TREATMENTNPK_Fence"                        
+#  [5] "sd_REPLICLATE__Intercept"                     "sd_SITE__Intercept"                          
+#  [7] "sigma"  
+
+# we get what we need - for random effect
+V_rep <-post$sd_REPLICATE__Intercept^2 # making it variance
+V_site <-post$sd_SITE__Intercept^2
+V_res <- post$sigma^2 
+```
+
+
+```{r}
+# we need to calculate variance for fixed effects - this is not so easy
+# get a posterior for fixed effect bits (you need to get this as one - it will be difficult to decompose these - why?)
+# I cannot seem to get a model matrix from brms so I am going to use lmer
+
+# calculate variance for fixed effects:
+
+# get a data frame of different posterior of fixed effects
+post_fix <- as.data.frame(t(post[,1:4]))
+
+# get a posterior of fixed effects
+V_fix <-  map_dbl(post_fix, ~ var(as.vector(. %*% t(model@pp$X))) )
+```
+
+
+```{r}
+# mcmc object (from coda package)
+post_mat <- as.mcmc(data.frame(V_rep, V_site, V_res, V_fix, row.names = NULL))
+
+summary(post_mat)
+plot(post_mat)
+
+head(post_mat)
+
+post_mat %>% data.frame %>% mutate(V_all = V_rep + V_site + V_res + V_fix,
+                                   P_rep = V_rep/(V_rep + V_site + V_res + V_fix),
+                                   P_site = V_site/(V_rep + V_site + V_res + V_fix),
+                                   P_res = V_res/(V_rep + V_site + V_res + V_fix),
+                                   P_fix = V_fix/(V_rep + V_site + V_res + V_fix),
+                                   P_all = P_rep + P_site + P_res + P_fix)          ->  post_mat2_plant.N
+
+```
+
+
+
+
+
+
+### Plant P
+
+Frequentist model
+```{r}
+# plant P
+model <- lmer(plant.P ~ TREATMENT + (TREATMENT|SITE) + (1|REPLICATE), data = data_NutNet)
+summary(model)
+hist(resid(model)) # Note that there is an outlier
+```
+
+
+Variance Estimation (using rptR)
+```{r}
+# Plant P
+rep_plant.P <- rptGaussian(plant.P ~ TREATMENT + (1|SITE),
+                 grname = c("SITE", "Fixed", "Residual"), 
+                 data = data_NutNet,
+                 ratio = FALSE,
+                 nboot = 100, parallel = TRUE, adjusted = FALSE)
+
+rep_plant.P
+```
+
+
+Bayesian Analysis
+```{r}
+# P
+# modelb_plant.P <- brm(plant.P ~ TREATMENT + (1|SITE) + (1|REPLICATE), 
+#                         data = data_NutNet,
+#                         chains = 2, cores = 2)
+
+# Save model
+# saveRDS(modelb_plant.P, "model_plantP.rds")
+```
+
+```{r}
+# Load model
+modelb_plant.P <- readRDS("model_plantP.rds")
+
+# bayesian R2 estimate of regression model
+bayes_R2(modelb_plant.P)
+```
+
+```{r}
+# get all posterior samples
+post <- posterior_samples(modelb_plant.P)
+
+# we get what we need - for random effect
+V_rep <-post$sd_REPLICATE__Intercept^2 # making it variance
+V_site <-post$sd_SITE__Intercept^2
+V_res <- post$sigma^2 
+```
+
+
+```{r}
+# calculate variance for fixed effects
+
+# get a data frame of different posterior of fixed effects
+post_fix <- as.data.frame(t(post[,1:4]))
+
+# get a posterior of fixed effects
+V_fix <-  map_dbl(post_fix, ~ var(as.vector(. %*% t(model@pp$X))) )
+
+# mcmc object (from coda package)
+post_mat <- as.mcmc(data.frame(V_rep, V_site, V_res, V_fix, row.names = NULL))
+
+summary(post_mat)
+plot(post_mat)
+
+head(post_mat)
+
+post_mat %>% data.frame %>% mutate(V_all = V_rep + V_site + V_res + V_fix,
+                                   P_rep = V_rep/(V_rep + V_site + V_res + V_fix),
+                                   P_site = V_site/(V_rep + V_site + V_res + V_fix),
+                                   P_res = V_res/(V_rep + V_site + V_res + V_fix),
+                                   P_fix = V_fix/(V_rep + V_site + V_res + V_fix),
+                                   P_all = P_rep + P_site + P_res + P_fix)          ->  post_mat2_plant.P
+
+```
+
+
+### Plant K
+
+Frequentist model
+```{r}
+# plant K
+model <- lmer(plant.K ~ TREATMENT + (1|SITE) + (1|REPLICATE), data = data_NutNet)
+summary(model)
+hist(resid(model)) # Seems meh, very pointy
+```
+
+
+Variance Estimation (using rptR)
+```{r}
+# Plant K
+rep_plant.K <- rptGaussian(plant.K ~ TREATMENT + (1|SITE),
+                 grname = c("SITE", "Fixed", "Residual"), 
+                 data = data_NutNet,
+                 ratio = FALSE,
+                 nboot = 100, parallel = TRUE, adjusted = FALSE)
+
+rep_plant.K
+```
+
+Bayesian Analysis
+```{r}
+# K
+# modelb_plant.K <- brm(plant.K ~ TREATMENT + (1|SITE) + (1|REPLICATE), 
+#                         data = data_NutNet,
+#                         chains = 2, cores = 2)
+
+# Save model
+# saveRDS(modelb_plant.K, "model_plantK.rds")
+```
+
+```{r}
+# Load model
+modelb_plant.K <- readRDS("model_plantK.rds")
+
+# bayesian R2 estimate of regression model
+bayes_R2(modelb_plant.K)
+```
+
+```{r}
+# get all posterior samples
+post <- posterior_samples(modelb_plant.K)
+
+# we get what we need - for random effects
+V_rep <-post$sd_REPLICATE__Intercept^2 # making it variance
+V_site <-post$sd_SITE__Intercept^2
+V_res <- post$sigma^2 
+```
+
+
+```{r}
+# calculate variance for fixed effects
+
+# get a data frame of different posterior of fixed effects
+post_fix <- as.data.frame(t(post[,1:4]))
+
+# get a posterior of fixed effects
+V_fix <-  map_dbl(post_fix, ~ var(as.vector(. %*% t(model@pp$X))) )
+
+# mcmc object (from coda package)
+post_mat <- as.mcmc(data.frame(V_rep, V_site, V_res, V_fix, row.names = NULL))
+
+summary(post_mat)
+plot(post_mat)
+
+head(post_mat)
+
+post_mat %>% data.frame %>% mutate(V_all = V_rep + V_site + V_res + V_fix,
+                                   P_rep = V_rep/(V_rep + V_site + V_res + V_fix),
+                                   P_site = V_site/(V_rep + V_site + V_res + V_fix),
+                                   P_res = V_res/(V_rep + V_site + V_res + V_fix),
+                                   P_fix = V_fix/(V_rep + V_site + V_res + V_fix),
+                                   P_all = P_rep + P_site + P_res + P_fix)          ->  post_mat2_plant.K
+
+```
+
+
+
+
+
+
+### Total Biomass
+
+Frequentist model
+```{r}
+# total biomass
+model <- lmer(TOTAL.AG.BIOMASS ~ TREATMENT + (1|SITE) + (1|REPLICATE), data = data_NutNet)
+summary(model)
+hist(resid(model)) # Note that there is an outlier
+```
+
+Variance Estimates (using rptR)
+```{r}
+# Total AG Biomass
+rep_total.ag.biomass <- rptGaussian(TOTAL.AG.BIOMASS ~ TREATMENT + (1|SITE),
+                 grname = c("SITE", "Fixed", "Residual"), 
+                 data = data_NutNet,
+                 ratio = FALSE,
+                 nboot = 100, parallel = TRUE, adjusted = FALSE)
+
+rep_total.ag.biomass
+```
+
+Bayesian Analysis
+```{r}
+# # total biomass
+# modelb_total.ag.biomass <- brm(TOTAL.AG.BIOMASS ~ TREATMENT + (1|SITE) + (1|REPLICATE),
+#                         data = data_NutNet,
+#                         chains = 2, cores = 2)
+
+# Save model
+# saveRDS(modelb_total.ag.biomass, "model_total.ag.biomass.rds")
+```
+
+```{r}
+# Load model
+modelb_total.ag.biomass <- readRDS("model_total.ag.biomass.rds")
+
+# bayesian R2 estimate of regression model
+bayes_R2(modelb_total.ag.biomass)
+```
+
+```{r}
+# get all posterior samples
+post <- posterior_samples(modelb_total.ag.biomass)
+
+# we get what we need - for random effects
+V_rep <-post$sd_REPLICATE__Intercept^2 # making it variance
+V_site <-post$sd_SITE__Intercept^2
+V_res <- post$sigma^2 
+```
+
+
+```{r}
+# calculate variance for fixed effects
+
+# get a data frame of different posterior of fixed effects
+post_fix <- as.data.frame(t(post[,1:4]))
+
+# get a posterior of fixed effects
+V_fix <-  map_dbl(post_fix, ~ var(as.vector(. %*% t(model@pp$X))) )
+
+# mcmc object (from coda package)
+post_mat <- as.mcmc(data.frame(V_rep, V_site, V_res, V_fix, row.names = NULL))
+
+summary(post_mat)
+plot(post_mat)
+
+head(post_mat)
+
+post_mat %>% data.frame %>% 
+  mutate(V_all = V_rep + V_site + V_res + V_fix,
+          P_rep = V_rep/(V_rep + V_site + V_res + V_fix),
+          P_site = V_site/(V_rep + V_site + V_res + V_fix),
+          P_res = V_res/(V_rep + V_site + V_res + V_fix),
+          P_fix = V_fix/(V_rep + V_site + V_res + V_fix),
+          P_all = P_rep + P_site + P_res + P_fix)          ->  post_mat2_total.ag.biomass
+
+```
+
+
+
+
+<br>
+
+***
+
+<br>
+
+
+## Means & SDs
+
+Average variance components across all variables within NutNet data set
+```{r}
+# finding average proportions of all variables
+mean_P_rep <- ((post_mat2_plant.N$P_rep + 
+                  post_mat2_plant.P$P_rep + 
+                  post_mat2_plant.K$P_rep + 
+                  post_mat2_total.ag.biomass$P_rep) / 4)
+mean_P_site <- ((post_mat2_plant.N$P_site + 
+                   post_mat2_plant.P$P_site + 
+                   post_mat2_plant.K$P_site + 
+                   post_mat2_total.ag.biomass$P_site) / 4)
+mean_P_res <- ((post_mat2_plant.N$P_res + 
+                  post_mat2_plant.P$P_res + 
+                  post_mat2_plant.K$P_res + 
+                  post_mat2_total.ag.biomass$P_res) / 4)
+mean_P_fix <- ((post_mat2_plant.N$P_fix + 
+                  post_mat2_plant.P$P_fix + 
+                  post_mat2_plant.K$P_fix + 
+                  post_mat2_total.ag.biomass$P_fix) / 4)
+
+propPost_NutNet <- as.data.frame(cbind(mean_P_rep, mean_P_site, mean_P_res, mean_P_fix))
+```
+
+```{r}
+propPost_NutNet %>% 
+  pivot_longer(everything(), values_to = "Variance") %>% 
+  group_by(name) %>%
+  summarise_all(.funs = c(Mean = "mean", sd = "sd"))
+```
+
+
+<br>
+
+***
+
+<br>
+
+## PLOTS
+
+### rptR
+
+Create data frame for plotting 
+```{r}
+# Function to pull variance values from rptR output
+
+create_VarTable <- function(repOutput, VariableName, BioHetVariable) {
+  
+  # retrieve variance values
+  varTable <- as.data.frame(repOutput$R)
+  
+  # make name usable
+  VariableName <- as.character(VariableName)
+  
+  # Pivot table
+  varTable <- varTable %>% 
+  rename(., Location = paste0(BioHetVariable)) %>% # rename SITE
+  mutate(
+    Variable = as.factor(paste0(VariableName)) # Add data identifier column
+  ) %>%
+  pivot_longer(-Variable, names_to = "Components", values_to = "Variance") # flip the table
+  
+  # add percent of total variance column
+  varTable$percentVar <- varTable$Variance/(sum(varTable$Variance))*100
+  
+  return(varTable)
+}
+```
+
+```{r}
+# Pull values for each variable and variance estimate
+varTable_plant.N <- create_VarTable(rep_plant.N, "plant.N", "SITE")
+varTable_plant.P <- create_VarTable(rep_plant.P, "plant.P", "SITE")
+varTable_plant.K <- create_VarTable(rep_plant.K, "plant.K", "SITE")
+varTable_total.ag.biomass <- create_VarTable(rep_total.ag.biomass, "total.ag.biomass", "SITE")
+
+# Create data frame with desired estimates
+varTable_NutNet <- rbind(varTable_plant.N, 
+                         varTable_plant.P, varTable_plant.K,
+                         varTable_total.ag.biomass)
+```
+
+*Variance Components Plot*
+```{r}
+library(forcats)
+library(ggthemes)
+
+varTable_NutNet %>%
+  mutate(Components = fct_relevel(Components, 
+                                  "Fixed", "Residual", "Location")) %>%
+  
+  ggplot(aes(x = Variable, y = percentVar, fill = Components)) + 
+  geom_bar(stat = "identity", position = "stack", width = .4) +
+  geom_text(aes(label = paste0(round(percentVar, 0), "%")), 
+            position = "stack", hjust = 1, size = 2, check_overlap = FALSE) + 
+    scale_fill_ptol() + 
+    coord_flip() + 
+  ylab("Proportion of Variance (%)") + 
+    theme_minimal(base_size = 12)
+    theme(axis.title = element_blank(), panel.grid.major.y = element_blank(), 
+          legend.position = "top")
+```
+
+
+
+
+
+### Bayes model
+
+Create data frame for plotting
+```{r}
+# Function to create data frames from posterior estimates
+create_bayesVarTable <- function(posteriorVarianceDF, variableName) {
+  # make variable name usable for character
+  varName <- as.character(variableName)
+  
+  # build data frame
+  dataFrame <- posteriorVarianceDF %>% 
+  mutate(
+    iteration = 1:length(posteriorVarianceDF$P_all), # make a col to represent each test
+    Variable = as.factor(paste(variableName))         # add Variable name
+  ) %>%
+  select(P_rep, P_site, P_res, P_fix, iteration, Variable) %>%
+  pivot_longer(c(-Variable, -iteration), values_to = "Variance") # flip the table
+}
+
+# Create smaller data frames of variance proportions
+propPost_plant.N <- create_bayesVarTable(post_mat2_plant.N, "plant.N")
+propPost_plant.P <- create_bayesVarTable(post_mat2_plant.P, "plant.P")
+propPost_plant.K <- create_bayesVarTable(post_mat2_plant.K, "plant.K")
+propPost_total.ag.biomass <- create_bayesVarTable(post_mat2_total.ag.biomass, "total.ag.biomass")
+
+
+# Combine to make one data frame for plotting
+propPost <- as.data.frame(rbind(propPost_plant.N, propPost_plant.P, 
+                                propPost_plant.K, propPost_total.ag.biomass))
+```
+
+
+
+
+```{r}
+# Rename variables for plotting
+propPost <- propPost %>%
+    mutate(
+    name = as.factor(recode(name,
+                        "P_fix" = "Fixed",
+                        "P_rep" = "Replicate",
+                        "P_res" = "Residual",
+                        "P_site" = "Location")),
+    Variable = as.factor(recode(Variable,
+                                "total.ag.biomass" = "Biomass",
+                                "plant.N" = "N (%)",
+                                "plant.K" = "K (%)",
+                                "plant.P" = "P (%)"))
+  ) %>%
+       arrange_at(4, desc) %>%
+     arrange(match(name, c("Location", "Residual", "Replicate", "Fixed")))
+
+# calculate mean & SE values
+propPost.sem <-
+  propPost %>% 
+  dplyr::group_by(name, Variable) %>%
+  summarise(mean = mean(Variance),
+            sem = sd(Variance),
+            upper = mean+sem,
+            lower = mean-sem)
+
+# rearrange order of variables
+propPost.sem <- propPost.sem %>%
+     arrange_at(4, desc) %>%
+     arrange(match(name, c("Location", "Residual", "Replicate", "Fixed")))
+
+propPost.sem
+
+# Convert SE values to cumulative sums for plotting purposes
+propPost.sem2 <- within(propPost.sem,mean2 <- ave(mean,Variable, FUN=cumsum))
+
+propPost.sem2 %>% filter(Variable == "N (%)")
+```
+
+
+
+Stacked Bar Plot
+```{r}
+library(ggthemes)
+
+plot <- 
+  propPost.sem2 %>% mutate(
+    Component = factor(name, levels=c("Fixed", "Replicate", "Residual", "Location"))) %>% 
+  
+  ggplot(aes(x = Variable, 
+             y = mean, 
+             fill = Component, colour = Component)) + 
+  geom_bar(stat = "identity", width = .4, alpha = .8) +
+  coord_cartesian(ylim = c(0, 1)) + 
+  scale_y_continuous(labels = scales::percent) + 
+  coord_flip() +
+  labs(x = "Outcome Variables",
+       y = "Proportion of Total Variance") +
+  scale_fill_ptol() + scale_colour_ptol() + 
+  theme_minimal() + 
+  theme(legend.position = "top")
+```
+
+
+
+Side-by-side bar plots of individual variance components
+```{r}
+plot2 <- propPost %>% mutate(
+  name = factor(name, levels=c("Fixed", "Replicate", "Residual", "Location"))) %>% 
+  
+  ggplot(aes(x = Variable, y = Variance, fill = name, colour = name)) + 
+  facet_grid(rows = vars(name)) +
+  stat_summary(fun.y = mean, geom = "bar", position = "dodge",width = 1, alpha = .8) +
+  stat_summary(fun.data = mean_cl_normal, geom = "errorbar", 
+               width = 0.15, position = position_dodge(width = 0.90), colour = "black") +
+  scale_y_continuous(labels = scales::percent) +
+  labs(x = "Outcome Variables",
+       y = "Proportion of Total Variance") +
+  scale_fill_ptol() + scale_colour_ptol() + coord_flip(ylim = c(0,1)) +
+  theme_minimal() + 
+  theme(legend.position = "none",
+        strip.text.y = element_text(angle = 0))
+        # axis.text.x = element_text(angle = -90, hjust = 0)) 
+```
+
+*Variance Components Plots (Bayes)*
+```{r}
+library(patchwork)
+
+plot + plot2 + plot_layout(widths = c(2, 1))
+```
+
+```{r, eval = FALSE, echo = FALSE}
+ggsave("plot_NutNet.tiff",
+ plot = last_plot(), # or give ggplot object name as in myPlot,
+ width = 7, height = 5,
+ units = "in", # other options c("in", "cm", "mm"),
+ dpi = 600)
+```
+
+<br>
+
+***
+
+<br>
+
+
+
+## Data Exploration
+
+```{r}
+# Dax - go to here (not all exp and code are useful)
+# https://github.com/paul-buerkner/brms
+# https://mjskay.github.io/tidybayes/articles/tidy-brms.html
+# https://www.rensvandeschoot.com/tutorials/brms-started/
+# and learn and do more exploration with this and other ones
+
+library(MCMCglmm)
+mean(V_rep) # this is posterior mean (variance of random effect estimate)
+posterior.mode(V_rep) # posterior mode because variation is not normally distributed
+
+# post_mat note:
+#   posterior should add up to one
+
+```
+
+
+```{r}
+ggplot(data  = data_NutNet,
+       aes(x = TREATMENT,
+           y = TOTAL.AG.BIOMASS,
+           colour = TREATMENT))+
+  geom_point(size = 1.2,
+             alpha = .8,
+             position = "jitter")+# to add some random noise for plotting purposes
+  theme_minimal() + theme(legend.position = "none")
+```
+
+```{r}
+get_variables(modelb_plant.N)
+```
+
+```{r}
+library(ggmcmc)
+
+model1transformed <- ggs(modelb_plant.N)
+ggplot(filter(model1transformed, Parameter %in% c("b_Intercept", "sigma", "r_SITE[burrawan.au,Intercept]")),
+       aes(x   = Iteration,
+           y   = value, 
+           col = as.factor(Chain)))+
+  geom_line() +
+  geom_vline(xintercept = 1000)+
+  facet_grid(Parameter ~ . ,
+             scale  = 'free_y',
+             switch = 'y')+
+  labs(title = "Caterpillar Plots", 
+       col   = "Chains")
+```
+
+```{r}
+modelb_plant.N %>%
+  spread_draws(b_Intercept, r_SITE[location,]) %>%
+  median_qi(location_mean = b_Intercept + r_SITE) %>%
+  ggplot(aes(y = location, x = location_mean, xmin = .lower, xmax = .upper)) +
+  geom_pointintervalh()
+```
+
+```{r}
+library(modelr)
+
+# data_NutNet %>%
+#   data_grid(SITE) %>%
+#   add_predicted_draws(modelb_plant.NPK) %>%
+#   ggplot(aes(x = .prediction, y = R_SITE)) +
+#   stat_slabh()
+```
+
+
+<br>
+
+***
+
+<br>
+
+
+# (II) CSV (Controlled Systematic Variability)
+Microcosms experiment  
+Milcu et al. (2018)  
+Sites: 14 European Labs  
+
+<br>
+
+Tested effect of presence of legume species on grass species. Introducted genetic and environmental variability by deliberately introducing unnacounted variability into lab-based designs. They did this by running replicates in growth chambers (highly controlled environments) and glasshouses (more variable environments). They also spatially varied soil resource distribution by introducing 6 sandpatches, varied the number of sand patches (0, 3, 6) among microcosms, used 3 distinct genotypes of legumes, and varied the number of genotypes (1, 2, 3) among microcosms.  
+
+<br>
+
+Variables:  
+`Legume``: Presence of legume species
+`CSV`: Type of controlled systematic variability (CTR, ENVw, ENVb, GENw, GENb)  
+`biomass_Shoot`: Shoot biomass of grass species
+`biomass_Root`: Root biomass of grass species
+`biomass_Total`: Total biomass of grass species
+`ratio_RootShoot`: Root to Shoot ratio of grass species
+
+`biomass_Seed`: Seed biomass of B. distachyon (legume)
+`height_B.dist`: Height of B. distachyon (legume)
+`N.shoot`: % N in B.distachyon
+`C.shoot`: % C in B.distachyon
+`delta15.N``: $\delta$^15^ N in B. distachyon
+`delta13.C`: $\delta$^13^ C in B. distachyon
+`substrate_ET`: Evapotranspiration of a common substrate using a simplified version of the tea bag litter decomposition method
+`litter`: Mass of litter (in g)
+
+Rename columns
+```{r}
+data_CSV <- rename(data_CSV,
+                   Legume = Treat..legume.,
+                   CSV = Treat..controlled.systematic.variabiliy.,
+                   biomass_Seed = Biom.dm..g...seed.,
+                   biomass_Shoot = Biom.dm..g...shoot.,
+                   biomass_Root = Biom.dm..g...root.,
+                   biomass_Total = Biom.dm..g...total.,
+                   height_legume = B..distachyon.height..cm.,
+                   ratio_RootShoot = Root.shoot,
+                   N.shoot = N.shoot....,
+                   C.shoot = C.shoot....,
+                   delta15.N = "δ15N....air.",
+                   delta13.C = "δ13C....PDB.",
+                   substrate_ET = ET..ml.day.,
+                   litter = Litter..g.
+                   )
+
+# Authors removed outliers but we'll keep these in.
+```
+
+```{r}
+data_CSV %>% glimpse()
+data_CSV %>% head(10)
+```
+
+
+## Analysis
+
+create `Replicate` variable for analysis by separating by Block (replicate) and Lab
+```{r}
+data_CSV$Replicate <-  paste0(data_CSV$Block, data_CSV$Lab) # add replicate variable
+```
+
+
+```{r}
+# complete cases
+data_CSV <- data_CSV[complete.cases(data_CSV), ] #
+```
+
+
+Frequency distributions of variables
+```{r}
+plot_frequencyDist(data_CSV, "biomass_Seed")
+plot_frequencyDist(data_CSV, "biomass_Shoot")
+plot_frequencyDist(data_CSV, "biomass_Root")
+plot_frequencyDist(data_CSV, "height_legume")
+plot_frequencyDist(data_CSV, "N.shoot")
+plot_frequencyDist(data_CSV, "C.shoot")
+plot_frequencyDist(data_CSV, "substrate_ET")
+plot_frequencyDist(data_CSV, "litter")
+```
+
+### Seed Biomass
+
+Frequentist model
+```{r}
+# Seed biomass (of B. distachyon)
+
+data_CSV$treatment <- paste(data_CSV$Legume, data_CSV$Method.comm,sep = "-")
+
+model <- lmer(scale(log(biomass_Seed+1)) ~ treatment - 1+ 
+                (treatment|Lab) + (1|CSV) + (1|Replicate), 
+                data = data_CSV)
+                
+summary(model)
+
+model <- lmer(scale(log(biomass_Seed+1)) ~ Legume - 1+ 
+                (Legume|Lab) + (1|Replicate), 
+                data = data_CSV)
+                
+summary(model)
+
+
+hist(resid(model)) # Note that there is an outlier
+
+# Total Variance
+var(data_CSV$biomass_Seed)
+```
+
+Variance Estimation (using rptR)
+```{r}
+rep_biomass_Seed <- rptGaussian(biomass_Seed ~ Legume*Method.comm + (1|Lab) + (1|CSV) + (1| Replicate),
+                    grname = c("Lab", "CSV", "Replicate", "Fixed", "Residual"), 
+                    data = data_CSV,
+                    ratio = FALSE,
+                    nboot = 100, parallel = FALSE, adjusted = FALSE)
+rep_biomass_Seed
+```
+
+
+Bayesian model
+```{r, eval = FALSE}
+# Seed Biomass (of B.distachyon)
+# modelb_biomass_Seed<- brm(biomass_Seed ~ Legume*Method.comm + 
+#                             (1|Lab) + (1|CSV) + (1|Replicate), 
+#                           data = data_CSV,
+#                           chains = 2, cores = 2)
+
+# Save model
+# saveRDS(modelb_biomass_Seed, "model_biomass_Seed.rds")
+```
+
+```{r}
+# Load model
+modelb_biomass_Seed <- readRDS("model_biomass_Seed.rds")
+
+# bayesian R2 estimate of regression model
+bayes_R2(modelb_biomass_Seed)
+```
+
+```{r}
+# get all posterior samples
+post <- posterior_samples(modelb_biomass_Seed)
+
+names(post)
+
+# we get what we need - for random effect
+V_rep <-post$sd_Replicate__Intercept^2 # making it variance
+V_site <-post$sd_Lab__Intercept^2
+V_CSV <- post$sd_CSV__Intercept^2
+V_res <- post$sigma^2 
+```
+
+
+```{r}
+# calculate variance for fixed effects
+
+# get a data frame of different posterior of fixed effects
+post_fix <- as.data.frame(t(post[,1:4]))
+
+# get a posterior of fixed effects
+V_fix <-  map_dbl(post_fix, ~ var(as.vector(. %*% t(model@pp$X))) )
+
+# mcmc object (from coda package)
+post_mat <- as.mcmc(data.frame(V_rep, V_site, V_CSV, V_res, V_fix, row.names = NULL))
+
+summary(post_mat)
+plot(post_mat)
+
+head(post_mat)
+
+post_mat %>% 
+  data.frame %>% 
+  mutate(V_all = V_rep + V_site + V_CSV + V_res + V_fix,
+         P_rep = V_rep/(V_rep + V_site + V_CSV + V_res + V_fix),
+         P_site = V_site/(V_rep + V_site + V_CSV + V_res + V_fix),
+         P_CSV = V_CSV/(V_rep + V_site + V_CSV + V_res + V_fix),
+         P_res = V_res/(V_rep + V_site + V_CSV + V_res + V_fix),
+         P_fix = V_fix/(V_rep + V_site + V_CSV + V_res + V_fix),
+         P_all = P_rep + P_site + P_CSV + P_res + P_fix)          ->  post_mat2_biomass_Seed
+
+```
+
+
+
+### Shoot Biomass
+
+Frequentist model
+```{r}
+# Shoot biomass
+model <- lmer(biomass_Shoot ~ Legume*Method.comm + 
+                (1|Lab) + (1|CSV) + (1|Replicate), 
+                data = data_CSV) # Model failed to converge
+                
+summary(model)
+# looks like the model didn't converge because Lab eats up so much of the variance, which is interesting
+
+hist(resid(model)) # Note that there is an outlier
+
+# Total Variance
+var(data_CSV$biomass_Shoot)
+```
+
+Variance Estimation (using rptR)
+```{r}
+rep_biomass_Shoot <- rptGaussian(biomass_Shoot ~ Legume*Method.comm + (1|Lab) + (1|CSV) + (1| Replicate),
+                    grname = c("Lab", "CSV", "Replicate", "Fixed", "Residual"), 
+                    data = data_CSV,
+                    ratio = FALSE,
+                    nboot = 100, parallel = FALSE, adjusted = FALSE)
+rep_biomass_Shoot
+```
+
+Bayesian model
+```{r, eval = FALSE}
+# Shoot Biomass
+# modelb_biomass_Shoot<- brm(biomass_Shoot ~ Legume*Method.comm + 
+#                             (1|Lab) + (1|CSV) + (1|Replicate), 
+#                           data = data_CSV,
+#                           chains = 2, cores = 2)
+
+# Save model
+# saveRDS(modelb_biomass_Shoot, "model_biomass_Shoot.rds")
+```
+
+```{r}
+# Load model
+modelb_biomass_Shoot <- readRDS("model_biomass_Shoot.rds")
+
+# bayesian R2 estimate of regression model
+bayes_R2(modelb_biomass_Shoot)
+```
+
+
+```{r}
+# get all posterior samples
+post <- posterior_samples(modelb_biomass_Shoot)
+
+
+# we get what we need - for random effect
+V_rep <-post$sd_Replicate__Intercept^2 # making it variance
+V_site <-post$sd_Lab__Intercept^2
+V_CSV <- post$sd_CSV__Intercept^2
+V_res <- post$sigma^2 
+```
+
+
+```{r}
+# calculate variance for fixed effects
+
+# get a data frame of different posterior of fixed effects
+post_fix <- as.data.frame(t(post[,1:4]))
+
+# get a posterior of fixed effects
+V_fix <-  map_dbl(post_fix, ~ var(as.vector(. %*% t(model@pp$X))) )
+
+# mcmc object (from coda package)
+post_mat <- as.mcmc(data.frame(V_rep, V_site, V_CSV, V_res, V_fix, row.names = NULL))
+
+summary(post_mat)
+plot(post_mat)
+
+head(post_mat)
+
+post_mat %>% 
+  data.frame %>% 
+  mutate(V_all = V_rep + V_site + V_CSV + V_res + V_fix,
+         P_rep = V_rep/(V_rep + V_site + V_CSV + V_res + V_fix),
+         P_site = V_site/(V_rep + V_site + V_CSV + V_res + V_fix),
+         P_CSV = V_CSV/(V_rep + V_site + V_CSV + V_res + V_fix),
+         P_res = V_res/(V_rep + V_site + V_CSV + V_res + V_fix),
+         P_fix = V_fix/(V_rep + V_site + V_CSV + V_res + V_fix),
+         P_all = P_rep + P_site + P_CSV + P_res + P_fix)          ->  post_mat2_biomass_Shoot
+
+```
+
+
+
+
+### Root Biomass
+
+Frequentist model
+```{r}
+# Root biomass
+model <- lmer(biomass_Root ~ Legume*Method.comm + 
+                (1|Lab) + (1|CSV) + (1|Replicate), 
+                data = data_CSV)
+                
+summary(model)
+hist(resid(model)) # Note that there is an outlier
+
+# Total Variance
+var(data_CSV$biomass_Root)
+```
+
+Variance Estimation (using rptR)
+```{r}
+rep_biomass_Root <- rptGaussian(biomass_Root ~ Legume*Method.comm + (1|Lab) + (1|CSV) + (1| Replicate),
+                    grname = c("Lab", "CSV", "Replicate", "Fixed", "Residual"), 
+                    data = data_CSV,
+                    ratio = FALSE,
+                    nboot = 100, parallel = TRUE, adjusted = FALSE)
+rep_biomass_Root
+```
+
+Bayesian model
+```{r, eval = FALSE}
+# Root Biomass
+# modelb_biomass_Root<- brm(biomass_Root ~ Legume*Method.comm + 
+#                             (1|Lab) + (1|CSV) + (1|Replicate), 
+#                           data = data_CSV,
+#                           chains = 2, cores = 2)
+
+# Save model
+# saveRDS(modelb_biomass_Root, "model_biomass_Root.rds")
+```
+
+```{r}
+# Load model
+modelb_biomass_Root <- readRDS("model_biomass_Root.rds")
+
+# bayesian R2 estimate of regression model
+bayes_R2(modelb_biomass_Root)
+```
+
+```{r}
+# get all posterior samples
+post <- posterior_samples(modelb_biomass_Root)
+
+
+# we get what we need - for random effect
+V_rep <-post$sd_Replicate__Intercept^2 # making it variance
+V_site <-post$sd_Lab__Intercept^2
+V_CSV <- post$sd_CSV__Intercept^2
+V_res <- post$sigma^2 
+```
+
+
+```{r}
+# calculate variance for fixed effects
+
+# get a data frame of different posterior of fixed effects
+post_fix <- as.data.frame(t(post[,1:4]))
+
+# get a posterior of fixed effects
+V_fix <-  map_dbl(post_fix, ~ var(as.vector(. %*% t(model@pp$X))) )
+
+# mcmc object (from coda package)
+post_mat <- as.mcmc(data.frame(V_rep, V_site, V_CSV, V_res, V_fix, row.names = NULL))
+
+summary(post_mat)
+plot(post_mat)
+
+head(post_mat)
+
+post_mat %>% 
+  data.frame %>% 
+  mutate(V_all = V_rep + V_site + V_CSV + V_res + V_fix,
+         P_rep = V_rep/(V_rep + V_site + V_CSV + V_res + V_fix),
+         P_site = V_site/(V_rep + V_site + V_CSV + V_res + V_fix),
+         P_CSV = V_CSV/(V_rep + V_site + V_CSV + V_res + V_fix),
+         P_res = V_res/(V_rep + V_site + V_CSV + V_res + V_fix),
+         P_fix = V_fix/(V_rep + V_site + V_CSV + V_res + V_fix),
+         P_all = P_rep + P_site + P_CSV + P_res + P_fix)          ->  post_mat2_biomass_Root
+
+```
+
+
+### Legume Height
+
+Frequentist model
+```{r}
+# Legume Height
+model <- lmer(height_legume ~ Legume*Method.comm + 
+                (1|Lab) + (1|CSV) + (1|Replicate), 
+                data = data_CSV)
+                
+summary(model)
+hist(resid(model)) # Note that there is an outlier
+
+# Total Variance
+var(data_CSV$height_legume)
+```
+
+Variance Estimation (using rptR)
+```{r}
+rep_height_legume <- rptGaussian(height_legume ~ Legume*Method.comm + (1|Lab) + (1|CSV) + (1| Replicate),
+                    grname = c("Lab", "CSV", "Replicate", "Fixed", "Residual"), 
+                    data = data_CSV,
+                    ratio = FALSE,
+                    nboot = 100, parallel = TRUE, adjusted = FALSE)
+rep_height_legume
+```
+
+Bayesian model
+```{r, eval = FALSE}
+# Legume height
+# modelb_height_legume<- brm(height_legume ~ Legume*Method.comm + 
+#                             (1|Lab) + (1|CSV) + (1|Replicate), 
+#                           data = data_CSV,
+#                           chains = 2, cores = 2)
+
+# Save model
+# saveRDS(modelb_height_legume, "model_height_legume.rds")
+```
+
+```{r}
+# Load model
+modelb_height_legume <- readRDS("model_height_legume.rds")
+
+# bayesian R2 estimate of regression model
+bayes_R2(modelb_height_legume)
+```
+
+```{r}
+# get all posterior samples
+post <- posterior_samples(modelb_height_legume)
+
+
+# we get what we need - for random effect
+V_rep <-post$sd_Replicate__Intercept^2 # making it variance
+V_site <-post$sd_Lab__Intercept^2
+V_CSV <- post$sd_CSV__Intercept^2
+V_res <- post$sigma^2 
+```
+
+
+```{r}
+# calculate variance for fixed effects
+
+# get a data frame of different posterior of fixed effects
+post_fix <- as.data.frame(t(post[,1:4]))
+
+# get a posterior of fixed effects
+V_fix <-  map_dbl(post_fix, ~ var(as.vector(. %*% t(model@pp$X))) )
+
+# mcmc object (from coda package)
+post_mat <- as.mcmc(data.frame(V_rep, V_site, V_CSV, V_res, V_fix, row.names = NULL))
+
+summary(post_mat)
+plot(post_mat)
+
+head(post_mat)
+
+post_mat %>% 
+  data.frame %>% 
+  mutate(V_all = V_rep + V_site + V_CSV + V_res + V_fix,
+         P_rep = V_rep/(V_rep + V_site + V_CSV + V_res + V_fix),
+         P_site = V_site/(V_rep + V_site + V_CSV + V_res + V_fix),
+         P_CSV = V_CSV/(V_rep + V_site + V_CSV + V_res + V_fix),
+         P_res = V_res/(V_rep + V_site + V_CSV + V_res + V_fix),
+         P_fix = V_fix/(V_rep + V_site + V_CSV + V_res + V_fix),
+         P_all = P_rep + P_site + P_CSV + P_res + P_fix)          ->  post_mat2_height_legume
+
+```
+
+
+
+### N Shoot
+
+Frequentist model
+```{r}
+# N shoot
+model <- lmer(N.shoot ~ Legume*Method.comm + 
+                (1|Lab) + (1|CSV) + (1|Replicate), 
+                data = data_CSV)
+                
+summary(model) # singular boundary
+hist(resid(model))
+
+# Total Variance
+var(data_CSV$N.shoot)
+```
+
+Variance Estimation (using rptR)
+```{r}
+rep_N.shoot <- rptGaussian(N.shoot ~ Legume*Method.comm + (1|Lab) + (1|CSV) + (1| Replicate),
+                    grname = c("Lab", "CSV", "Replicate", "Fixed", "Residual"), 
+                    data = data_CSV,
+                    ratio = FALSE,
+                    nboot = 100, parallel = TRUE, adjusted = FALSE)
+rep_N.shoot
+```
+
+Bayesian model
+```{r, eval = FALSE}
+# N shoot
+# modelb_N.shoot<- brm(N.shoot ~ Legume*Method.comm + 
+#                             (1|Lab) + (1|CSV) + (1|Replicate), 
+#                           data = data_CSV,
+#                           chains = 2, cores = 2)
+
+# Save model
+# saveRDS(modelb_N.shoot, "model_Nshoot.rds")
+```
+
+```{r}
+# Load model
+modelb_N.shoot <- readRDS("model_Nshoot.rds")
+
+# bayesian R2 estimate of regression model
+bayes_R2(modelb_N.shoot)
+```
+
+```{r}
+# get all posterior samples
+post <- posterior_samples(modelb_N.shoot)
+
+
+# we get what we need - for random effect
+V_rep <-post$sd_Replicate__Intercept^2 # making it variance
+V_site <-post$sd_Lab__Intercept^2
+V_CSV <- post$sd_CSV__Intercept^2
+V_res <- post$sigma^2 
+```
+
+
+```{r}
+# calculate variance for fixed effects
+
+# get a data frame of different posterior of fixed effects
+post_fix <- as.data.frame(t(post[,1:4]))
+
+# get a posterior of fixed effects
+V_fix <-  map_dbl(post_fix, ~ var(as.vector(. %*% t(model@pp$X))) )
+
+# mcmc object (from coda package)
+post_mat <- as.mcmc(data.frame(V_rep, V_site, V_CSV, V_res, V_fix, row.names = NULL))
+
+summary(post_mat)
+plot(post_mat)
+
+head(post_mat)
+
+post_mat %>% 
+  data.frame %>% 
+  mutate(V_all = V_rep + V_site + V_CSV + V_res + V_fix,
+         P_rep = V_rep/(V_rep + V_site + V_CSV + V_res + V_fix),
+         P_site = V_site/(V_rep + V_site + V_CSV + V_res + V_fix),
+         P_CSV = V_CSV/(V_rep + V_site + V_CSV + V_res + V_fix),
+         P_res = V_res/(V_rep + V_site + V_CSV + V_res + V_fix),
+         P_fix = V_fix/(V_rep + V_site + V_CSV + V_res + V_fix),
+         P_all = P_rep + P_site + P_CSV + P_res + P_fix)          ->  post_mat2_N.shoot
+
+```
+
+
+
+### C Shoot
+
+Frequentist model
+```{r}
+# C shoot
+model <- lmer(C.shoot ~ Legume*Method.comm + 
+                (1|Lab) + (1|CSV) + (1|Replicate), 
+                data = data_CSV)
+                
+summary(model)
+hist(resid(model)) # not normally distributed
+
+# Total Variance
+var(data_CSV$C.shoot)
+```
+
+Variance Estimation (using rptR)
+```{r}
+rep_C.shoot <- rptGaussian(C.shoot ~ Legume*Method.comm + (1|Lab) + (1|CSV) + (1| Replicate),
+                    grname = c("Lab", "CSV", "Replicate", "Fixed", "Residual"), 
+                    data = data_CSV,
+                    ratio = FALSE,
+                    nboot = 100, parallel = TRUE, adjusted = FALSE)
+rep_C.shoot
+```
+
+
+Bayesian model
+```{r, eval = FALSE}
+# C shoot
+# modelb_C.shoot<- brm(C.shoot ~ Legume*Method.comm + 
+#                             (1|Lab) + (1|CSV) + (1|Replicate), 
+#                           data = data_CSV,
+#                           chains = 2, cores = 2)
+
+# Save model
+# saveRDS(modelb_C.shoot, "model_Cshoot.rds")
+```
+
+```{r}
+# Load model
+modelb_C.shoot <- readRDS("model_Cshoot.rds")
+
+# bayesian R2 estimate of regression model
+bayes_R2(modelb_C.shoot)
+```
+
+```{r}
+# get all posterior samples
+post <- posterior_samples(modelb_C.shoot)
+
+
+# we get what we need - for random effect
+V_rep <-post$sd_Replicate__Intercept^2 # making it variance
+V_site <-post$sd_Lab__Intercept^2
+V_CSV <- post$sd_CSV__Intercept^2
+V_res <- post$sigma^2 
+```
+
+
+```{r}
+# calculate variance for fixed effects
+
+# get a data frame of different posterior of fixed effects
+post_fix <- as.data.frame(t(post[,1:4]))
+
+# get a posterior of fixed effects
+V_fix <-  map_dbl(post_fix, ~ var(as.vector(. %*% t(model@pp$X))) )
+
+# mcmc object (from coda package)
+post_mat <- as.mcmc(data.frame(V_rep, V_site, V_CSV, V_res, V_fix, row.names = NULL))
+
+summary(post_mat)
+plot(post_mat)
+
+head(post_mat)
+
+post_mat %>% 
+  data.frame %>% 
+  mutate(V_all = V_rep + V_site + V_CSV + V_res + V_fix,
+         P_rep = V_rep/(V_rep + V_site + V_CSV + V_res + V_fix),
+         P_site = V_site/(V_rep + V_site + V_CSV + V_res + V_fix),
+         P_CSV = V_CSV/(V_rep + V_site + V_CSV + V_res + V_fix),
+         P_res = V_res/(V_rep + V_site + V_CSV + V_res + V_fix),
+         P_fix = V_fix/(V_rep + V_site + V_CSV + V_res + V_fix),
+         P_all = P_rep + P_site + P_CSV + P_res + P_fix)          ->  post_mat2_C.shoot
+
+```
+
+
+
+### Substrate Evapotranspiration
+
+Frequentist model
+```{r}
+# Substrate Evapotranspiration
+model <- lmer(substrate_ET ~ Legume*Method.comm + 
+                (1|Lab) + (1|CSV) + (1|Replicate), 
+                data = data_CSV)
+                
+summary(model)
+hist(resid(model)) # Note that there is an outlier
+
+# Total Variance
+var(data_CSV$substrate_ET)
+```
+
+Variance Estimation (using rptR)
+```{r}
+rep_substrate_ET <- rptGaussian(substrate_ET ~ Legume*Method.comm + (1|Lab) + (1|CSV) + (1| Replicate),
+                    grname = c("Lab", "CSV", "Replicate", "Fixed", "Residual"), 
+                    data = data_CSV,
+                    ratio = FALSE,
+                    nboot = 100, parallel = TRUE, adjusted = FALSE)
+rep_substrate_ET
+```
+
+
+Bayesian model
+```{r, eval = FALSE}
+# Substrate Evapotranspiration
+# modelb_substrate_ET<- brm(substrate_ET ~ Legume*Method.comm + 
+#                             (1|Lab) + (1|CSV) + (1|Replicate), 
+#                           data = data_CSV,
+#                           chains = 2, cores = 2)
+
+# Save model
+# saveRDS(modelb_substrate_ET, "model_substrate_ET.rds")
+```
+
+```{r}
+# Load model
+modelb_substrate_ET <- readRDS("model_substrate_ET.rds")
+
+# bayesian R2 estimate of regression model
+bayes_R2(modelb_substrate_ET)
+```
+
+```{r}
+# get all posterior samples
+post <- posterior_samples(modelb_substrate_ET)
+
+
+# we get what we need - for random effect
+V_rep <-post$sd_Replicate__Intercept^2 # making it variance
+V_site <-post$sd_Lab__Intercept^2
+V_CSV <- post$sd_CSV__Intercept^2
+V_res <- post$sigma^2 
+```
+
+
+```{r}
+# calculate variance for fixed effects
+
+# get a data frame of different posterior of fixed effects
+post_fix <- as.data.frame(t(post[,1:4]))
+
+# get a posterior of fixed effects
+V_fix <-  map_dbl(post_fix, ~ var(as.vector(. %*% t(model@pp$X))) )
+
+# mcmc object (from coda package)
+post_mat <- as.mcmc(data.frame(V_rep, V_site, V_CSV, V_res, V_fix, row.names = NULL))
+
+summary(post_mat)
+plot(post_mat)
+
+head(post_mat)
+
+post_mat %>% 
+  data.frame %>% 
+  mutate(V_all = V_rep + V_site + V_CSV + V_res + V_fix,
+         P_rep = V_rep/(V_rep + V_site + V_CSV + V_res + V_fix),
+         P_site = V_site/(V_rep + V_site + V_CSV + V_res + V_fix),
+         P_CSV = V_CSV/(V_rep + V_site + V_CSV + V_res + V_fix),
+         P_res = V_res/(V_rep + V_site + V_CSV + V_res + V_fix),
+         P_fix = V_fix/(V_rep + V_site + V_CSV + V_res + V_fix),
+         P_all = P_rep + P_site + P_CSV + P_res + P_fix)          ->  post_mat2_substrate_ET
+
+```
+
+
+
+### Litter Decomposition
+
+Frequentist model
+```{r}
+# Litter mass (g)
+model <- lmer(litter ~ Legume*Method.comm + 
+                (1|Lab) + (1|CSV) + (1|Replicate), 
+                data = data_CSV)
+                
+summary(model)
+hist(resid(model)) # some possible positive outliers
+
+# Total Variance
+var(data_CSV$litter)
+```
+
+Variance Estimation (using rptR)
+```{r}
+rep_litter <- rptGaussian(litter ~ Legume*Method.comm + (1|Lab) + (1|CSV) + (1| Replicate),
+                    grname = c("Lab", "CSV", "Replicate", "Fixed", "Residual"), 
+                    data = data_CSV,
+                    ratio = FALSE,
+                    nboot = 100, parallel = TRUE, adjusted = FALSE)
+rep_litter
+```
+
+
+Bayesian model
+```{r, eval = FALSE}
+# Litter mass (g)
+# modelb_litter <- brm(litter ~ Legume*Method.comm + 
+#                             (1|Lab) + (1|CSV) + (1|Replicate), 
+#                           data = data_CSV,
+#                           chains = 2, cores = 2)
+
+# Save model
+# saveRDS(modelb_litter, "model_litter.rds")
+```
+
+```{r}
+# Load model
+modelb_litter <- readRDS("model_litter.rds")
+
+# bayesian R2 estimate of regression model
+bayes_R2(modelb_litter)
+```
+
+```{r}
+# get all posterior samples
+post <- posterior_samples(modelb_litter)
+
+
+# we get what we need - for random effect
+V_rep <-post$sd_Replicate__Intercept^2 # making it variance
+V_site <-post$sd_Lab__Intercept^2
+V_CSV <- post$sd_CSV__Intercept^2
+V_res <- post$sigma^2 
+```
+
+
+```{r}
+# calculate variance for fixed effects
+
+# get a data frame of different posterior of fixed effects
+post_fix <- as.data.frame(t(post[,1:4]))
+
+# get a posterior of fixed effects
+V_fix <-  map_dbl(post_fix, ~ var(as.vector(. %*% t(model@pp$X))) )
+
+# mcmc object (from coda package)
+post_mat <- as.mcmc(data.frame(V_rep, V_site, V_CSV, V_res, V_fix, row.names = NULL))
+
+summary(post_mat)
+plot(post_mat)
+
+head(post_mat)
+
+post_mat %>% 
+  data.frame %>% 
+  mutate(V_all = V_rep + V_site + V_CSV + V_res + V_fix,
+         P_rep = V_rep/(V_rep + V_site + V_CSV + V_res + V_fix),
+         P_site = V_site/(V_rep + V_site + V_CSV + V_res + V_fix),
+         P_CSV = V_CSV/(V_rep + V_site + V_CSV + V_res + V_fix),
+         P_res = V_res/(V_rep + V_site + V_CSV + V_res + V_fix),
+         P_fix = V_fix/(V_rep + V_site + V_CSV + V_res + V_fix),
+         P_all = P_rep + P_site + P_CSV + P_res + P_fix)          ->  post_mat2_litter
+
+```
+
+
+
+<br>
+
+***
+
+<br>
+
+
+## Means & SDs
+
+Average variance components across all variables within NutNet data set
+```{r}
+# finding average proportions of all variables
+mean_P_rep <- ((post_mat2_biomass_Seed$P_rep + 
+                  post_mat2_biomass_Shoot$P_rep + 
+                  post_mat2_biomass_Root$P_rep + 
+                  post_mat2_height_legume$P_rep + 
+                  post_mat2_N.shoot$P_rep + 
+                  post_mat2_C.shoot$P_rep + 
+                  post_mat2_substrate_ET$P_rep + 
+                  post_mat2_litter$P_rep) / 8)
+mean_P_site <- ((post_mat2_biomass_Seed$P_site + 
+                  post_mat2_biomass_Shoot$P_site + 
+                  post_mat2_biomass_Root$P_site + 
+                  post_mat2_height_legume$P_site + 
+                  post_mat2_N.shoot$P_site + 
+                  post_mat2_C.shoot$P_site + 
+                  post_mat2_substrate_ET$P_site + 
+                  post_mat2_litter$P_site) / 8)
+mean_P_CSV <- ((post_mat2_biomass_Seed$P_CSV + 
+                  post_mat2_biomass_Shoot$P_CSV + 
+                  post_mat2_biomass_Root$P_CSV + 
+                  post_mat2_height_legume$P_CSV + 
+                  post_mat2_N.shoot$P_CSV + 
+                  post_mat2_C.shoot$P_CSV + 
+                  post_mat2_substrate_ET$P_CSV + 
+                  post_mat2_litter$P_CSV) / 8)
+mean_P_res <- ((post_mat2_biomass_Seed$P_res + 
+                  post_mat2_biomass_Shoot$P_res + 
+                  post_mat2_biomass_Root$P_res + 
+                  post_mat2_height_legume$P_res + 
+                  post_mat2_N.shoot$P_res + 
+                  post_mat2_C.shoot$P_res + 
+                  post_mat2_substrate_ET$P_res + 
+                  post_mat2_litter$P_res) / 8)
+mean_P_fix <- ((post_mat2_biomass_Seed$P_fix + 
+                  post_mat2_biomass_Shoot$P_fix + 
+                  post_mat2_biomass_Root$P_fix + 
+                  post_mat2_height_legume$P_fix + 
+                  post_mat2_N.shoot$P_fix + 
+                  post_mat2_C.shoot$P_fix + 
+                  post_mat2_substrate_ET$P_fix + 
+                  post_mat2_litter$P_fix) / 8)
+
+
+propPost_CSV <- as.data.frame(cbind(mean_P_rep, mean_P_site, 
+                                    mean_P_CSV, mean_P_res, mean_P_fix))
+```
+
+```{r}
+propPost_CSV %>% 
+  pivot_longer(everything(), values_to = "Variance") %>% 
+  group_by(name) %>%
+  summarise_all(.funs = c(Mean = "mean", sd = "sd"))
+```
+
+
+<br>
+
+***
+
+<br>
+
+
+
+## PLOTS
+
+###rptR
+
+Pull variance values from rptR output & Create table with variance components
+```{r}
+varTable_biomass_Seed <- create_VarTable(rep_biomass_Seed, "biomass_Seed", "Lab")
+varTable_biomass_Shoot <- create_VarTable(rep_biomass_Shoot, "biomass_Shoot", "Lab")
+varTable_biomass_Root <- create_VarTable(rep_biomass_Root, "biomass_Root", "Lab")
+varTable_height_legume <- create_VarTable(rep_height_legume, "height_legume", "Lab")
+varTable_N.shoot <- create_VarTable(rep_N.shoot, "N.shoot", "Lab")
+varTable_C.shoot <- create_VarTable(rep_C.shoot, "C.shoot", "Lab")
+varTable_substrate_ET <- create_VarTable(rep_substrate_ET, "substrate_ET", "Lab")
+varTable_litter <- create_VarTable(rep_litter, "litter", "Lab")
+
+
+# Create table
+varTable_CSV <- rbind(varTable_biomass_Seed, varTable_biomass_Shoot, 
+                      varTable_biomass_Root, varTable_height_legume,
+                      varTable_N.shoot, varTable_C.shoot,
+                      varTable_substrate_ET, varTable_litter)
+```
+
+
+*Plot*
+```{r}
+library(forcats)
+
+varTable_CSV %>%
+  mutate(Components = fct_relevel(Components,
+                                  "Fixed", "Replicate", "CSV", "Residual", "Location")) %>%
+  
+  ggplot(aes(x = Variable, y = percentVar, fill = Components)) + 
+  geom_bar(stat = "identity", position = "stack", width = .4) +
+  geom_text(aes(label = paste0(round(percentVar, 0), "%")), 
+            position = "stack", hjust = 1, size = 2, check_overlap = FALSE) + 
+    scale_fill_ptol() + 
+    coord_flip() + 
+  ylab("Proportion of Variance (%)") + 
+    theme_minimal(base_size = 12) 
+    theme(axis.title = element_blank(), panel.grid.major.y = element_blank(), 
+          legend.position = "top")
+
+```
+
+
+### Bayes model
+
+Create data frame for plotting
+```{r}
+# Function to create data frames from posterior estimates
+create_bayesVarTable <- function(posteriorVarianceDF, variableName) {
+  # make variable name usable for character
+  varName <- as.character(variableName)
+  
+  # build data frame
+  dataFrame <- posteriorVarianceDF %>% 
+  mutate(
+    iteration = 1:length(posteriorVarianceDF$P_all), # make a col to represent each test
+    Variable = as.factor(paste(variableName))         # add Variable name
+  ) %>%
+  select(P_rep, P_site, P_CSV, P_res, P_fix, iteration, Variable) %>%
+  pivot_longer(c(-Variable, -iteration), values_to = "Variance") # flip the table
+}
+
+# Create smaller data frames of variance proportions
+propPost_biomass_Seed <- create_bayesVarTable(post_mat2_biomass_Seed, "biomass_Seed")
+propPost_biomass_Shoot <- create_bayesVarTable(post_mat2_biomass_Shoot, "biomass_Shoot")
+propPost_biomass_Root <- create_bayesVarTable(post_mat2_biomass_Root, "biomass_Root")
+propPost_height_legume <- create_bayesVarTable(post_mat2_height_legume, "height_legume")
+propPost_N.shoot <- create_bayesVarTable(post_mat2_N.shoot, "N.shoot")
+propPost_C.shoot <- create_bayesVarTable(post_mat2_C.shoot, "C.shoot")
+propPost_substrate_ET <- create_bayesVarTable(post_mat2_substrate_ET, "substrate_ET")
+propPost_litter <- create_bayesVarTable(post_mat2_litter, "litter")
+
+
+# Combine to make one data frame for plotting
+propPost_CSV <- as.data.frame(rbind(propPost_biomass_Seed, propPost_biomass_Shoot, 
+                                propPost_biomass_Root, propPost_height_legume,
+                                propPost_N.shoot, propPost_C.shoot,
+                                propPost_substrate_ET, propPost_litter))
+```
+
+
+```{r, eval = FALSE}
+# finding average proportions of all variables
+mean_P_rep <- ((post_mat2_plant.N$P_rep + 
+                  post_mat2_plant.P$P_rep + 
+                  post_mat2_plant.K$P_rep + 
+                  post_mat2_total.ag.biomass$P_rep) / 4)
+mean_P_site <- ((post_mat2_plant.N$P_site + 
+                   post_mat2_plant.P$P_site + 
+                   post_mat2_plant.K$P_site + 
+                   post_mat2_total.ag.biomass$P_site) / 4)
+mean_P_res <- ((post_mat2_plant.N$P_res + 
+                  post_mat2_plant.P$P_res + 
+                  post_mat2_plant.K$P_res + 
+                  post_mat2_total.ag.biomass$P_res) / 4)
+mean_P_fix <- ((post_mat2_plant.N$P_fix + 
+                  post_mat2_plant.P$P_fix + 
+                  post_mat2_plant.K$P_fix + 
+                  post_mat2_total.ag.biomass$P_fix) / 4)
+
+propPost_CSV.mean <- as.data.frame(cbind(mean_P_rep, mean_P_site, mean_P_res, mean_P_fix))
+```
+
+
+```{r}
+# Rename variables for plotting
+propPost_CSV <- propPost_CSV %>%
+    mutate(
+    name = as.factor(recode(name,
+                        "P_fix" = "Fixed",
+                        "P_rep" = "Replicate",
+                        "P_CSV" = "CSV",
+                        "P_res" = "Residual",
+                        "P_site" = "Location")),
+    Variable = as.factor(recode(Variable,
+                                "biomass_Seed" = "Seed Biomass",
+                                "height_legume" = "Legume Height",
+                                "biomass_Shoot" = "Shoot Biomass",
+                                "biomass_Root" = "Root Biomass",
+                                "N.shoot" = "N (shoot)",
+                                "C.shoot" = "C (shoot)",
+                                "substrate_ET" = "Evapotranspiration",
+                                "litter" = "Litter Decomposition"))
+  ) %>%
+       arrange_at(4, desc) %>%
+     arrange(match(name, c("Location", "Residual", "Replicate", "CSV", "Fixed")))
+
+# calculate mean & SE values
+propPost_CSV.sem <-
+  propPost_CSV %>% 
+  dplyr::group_by(name, Variable) %>%
+  summarise(mean = mean(Variance),
+            sem = sd(Variance),
+            upper = mean+sem,
+            lower = mean-sem)
+
+# rearrange order of variables
+propPost_CSV.sem <- propPost_CSV.sem %>%
+     arrange_at(4, desc) %>%
+     arrange(match(name, c("Location", "Residual", "Replicate", "CSV", "Fixed")))
+
+propPost_CSV.sem
+
+# Convert SE values to cumulative sums for plotting purposes
+propPost_CSV.sem2 <- within(propPost_CSV.sem,mean2 <- ave(mean,Variable, FUN=cumsum))
+
+propPost_CSV.sem2 %>% filter(Variable == "Shoot Biomass")
+
+
+
+```
+
+
+
+Stacked Bar Plot
+```{r}
+library(ggthemes)
+
+plot1_CSV <- 
+  propPost_CSV.sem2 %>% mutate(
+    Component = factor(name, levels=c("Fixed", "CSV", "Replicate", "Residual", "Location"))) %>% 
+  
+  ggplot(aes(x = Variable, 
+             y = mean, 
+             fill = Component, colour = Component)) + 
+  geom_bar(stat = "identity", width = .4, alpha = .8) +
+  coord_cartesian(ylim = c(0, 1)) + 
+  scale_y_continuous(labels = scales::percent) + 
+  coord_flip() +
+  labs(x = "Outcome Variables",
+       y = "Proportion of Total Variance") +
+  scale_fill_ptol() + scale_colour_ptol() + 
+  theme_minimal() + 
+  theme(legend.position = "top")
+```
+
+
+
+Side-by-side bar plots of individual variance components
+```{r}
+library(Hmisc)
+plot2_CSV <- propPost_CSV %>% mutate(
+  name = factor(name, levels=c("Fixed", "CSV", "Replicate", "Residual", "Location"))) %>% 
+  
+  ggplot(aes(x = Variable, y = Variance, fill = name, colour = name)) + 
+  facet_grid(rows = vars(name)) +
+  stat_summary(fun.y = mean, geom = "bar", position = "dodge",width = 1, alpha = .8) +
+  stat_summary(fun.y = mean, 
+               fun.ymin = function(x) mean(x) - sd(x), 
+               fun.ymax = function(x) mean(x) + sd(x),
+               geom = "errorbar",
+               width = 0.00, position = position_dodge(width = 0.90), colour = "black") +
+  scale_y_continuous(labels = scales::percent) +
+  labs(x = "Outcome Variables",
+       y = "Proportion of Total Variance") +
+  scale_fill_ptol() + scale_colour_ptol() + coord_flip(ylim = c(0,1)) +
+  theme_minimal() + 
+  theme(legend.position = "none",
+        strip.text.y = element_text(angle = 0, size = 8))
+        # axis.text.x = element_text(angle = -90, hjust = 0)) 
+```
+
+*Variance Components Plots (Bayes)*
+```{r}
+library(patchwork)
+
+plot1_CSV + plot2_CSV + plot_layout(widths = c(2, 1))
+```
+
+CSV: Controlled Systematic Variance  
+Location: (N = 14)  
+
+```{r, eval = FALSE, echo = FALSE}
+ggsave("plot_CSV.tiff",
+ plot = last_plot(), # or give ggplot object name as in myPlot,
+ width = 8, height = 6,
+ units = "in", # other options c("in", "cm", "mm"),
+ dpi = 600)
+```
+
+<br>
+
+***
+
+<br>
+
+
+# (III) BLM Data
+
+*Bureau of Land Management data*
+
+```{r}
+data_BLM %>% glimpse()
+data_BLM %>% head(30) %>% arrange(desc(PlotID))
+dim(data_BLM)
+
+# combine projectName with PlotID, only use one year
+```
+
+*Data Wrangling*
+
+***
+
+Limit data to arid grassland/steppe
+```{r}
+# Eliminate plots with >5% tree cover
+data_BLM <- data_BLM %>%
+  mutate(
+      sumTreeCover = select(., c(InvTreeCover_AH, NonInvTreeCover_AH)) %>% rowSums(na.rm = TRUE)) %>%
+  filter(sumTreeCover < 5)
+
+# Only include Project Sites with > 0% sagebrush cover
+data_BLM <- data_BLM %>% 
+  filter(SagebrushCover_AH > 0)
+
+# Only include Project Sites with > 0% invasive annual grass cover 
+# (this should mean that all regions at least have potential for 
+# invasion by annual grass)
+data_BLM <- data_BLM %>%
+  filter(InvAnnGrassCover_AH > 0)
+```
+
+Data set reduced from > 10,000 points to 2,812
+
+
+
+
+Create replicate variable
+```{r}
+# Add Year to its own column
+list_years <- c("2000", "2001", "2002", "2003", "2004", 
+                "2005", "2006", "2007", "2008", "2009", 
+                "2010", "2011", "2012", "2013", "2014", 
+                "2015", "2016", "2017", "2018", "2019")
+
+data_BLM <- map_df(list_years, ~ filter(data_BLM, str_detect(ProjectName, .x)) %>%
+                    mutate(Year = str_extract(ProjectName, .x)))
+
+# Separate year from ProjectName
+data_BLM <- data_BLM %>%
+  mutate(
+    ProjectName = as.factor(gsub("([0-9]+).*$", "", ProjectName))
+  )
+
+# Limit to only most recent year
+range(data_BLM$Year)
+
+data_BLM <- data_BLM %>% filter(Year == 2017)
+data_BLM
+levels(data_BLM$ProjectName)
+
+# Create replicate variable
+#   Plots within each project (combined to avoid accidental duplicates across projects)
+
+# Each row of data is a replicate, so this may not be necessary
+
+data_BLM$Replicate <- paste0(data_BLM$ProjectName, data_BLM$PlotID)
+
+
+# How many replicates in ProjectName?
+data_BLM %>% 
+  group_by(as.factor(ProjectName)) %>%
+  summarise(no_rows = length(as.factor(ProjectName)))
+```
+
+
+
+
+## Analysis
+
+Difference between BLM variable names:  
+
+__ProjectName__: Refers to the broader project area the data was collected in. Generally includes the state, BLM management office and year.
+(what Tim says we can treat as our "site/location" variable)  
+__PlotID__: Name for each location or "plot" where data is collected, as assigned by the data collector. Duplicate Plot ID's may exist among different Sites and Projects, but not within the same Site.
+(So each PlotID is unique)  
+__PlotKey__: Unique numeric ID associated with each plot location. This is automatically generated in DIMA the first time the plot is created. Future visits to the same plot might use the same PlotKey. Users are encouraged to use spatial joins to track trend over time.
+(So sometimes, but not always, there may be multiple years of data for a plot location, which is tracked using this variable)  
+
+<br>
+
+Frequency distributions
+```{r}
+# transforming some of the data
+# Note that soil stablity is a measurement 0 - 6 (how this is determined - some sort of artificial scale???)
+hist(data_BLM$SoilStability_All)
+hist(data_BLM$SoilStability_Protected)
+hist(data_BLM$NonInvPerenGrassCover_AH)
+
+# just creating a smaller data set for me for a test
+dim(data_BLM)
+sum(complete.cases(data_BLM)) # OK this loses a lot of data
+
+```
+
+
+```{r}
+# z-transformations
+# This makes it so that we should get a total variance of 1 
+data_BLM %>% 
+  mutate(
+    z_soil_stab = scale(SoilStability_All), 
+    z_nonInv_grass_cover = scale(NonInvPerenGrassCover_AH),
+    z_nonInv_forb_cover = scale(NonInvPerenForbCover_AH),
+    z_nonInv_shrub_cover = scale(NonInvShrubCover_AH),
+    z_sagebrush_cover = scale(SagebrushCover_AH),
+    z_inv_ann_grass_cover = scale(InvAnnGrassCover_AH),
+    z_inv_ann_forb_cover = scale(InvAnnForbCover_AH),
+    z_total_foliar_cover = scale(TotalFoliarCover_FH),
+    PlotKey = as.factor(PlotKey)
+    ) %>% 
+  select(ProjectName, PlotID, Replicate, z_soil_stab, z_nonInv_grass_cover,
+         z_nonInv_forb_cover, z_nonInv_shrub_cover, z_sagebrush_cover,
+         z_inv_ann_grass_cover, z_inv_ann_forb_cover, z_total_foliar_cover) -> sdata_BLM
+
+sdata_BLM <- sdata_BLM[complete.cases(sdata_BLM), ]
+
+# random slope model
+model <- lmer(z_soil_stab ~ z_nonInv_grass_cover + (1 + z_nonInv_grass_cover|ProjectName), 
+              data = sdata_BLM)
+summary(model)
+hist(resid(model)) # Looks great
+
+# random intercept model
+model0 <- lmer(z_soil_stab ~ z_nonInv_grass_cover + (1 |ProjectName), 
+               data = sdata_BLM)
+summary(model0)
+hist(resid(model0)) 
+
+# difference between random slope and random intercept model is pretty much negligible, but every so slightly more variance is attributed to the random slope variable
+```
+
+
+### Non-Invasive Grass Cover
+
+Check model residuals
+```{r}
+# random slope model (using lmer)
+model <- lmer(z_soil_stab ~ z_nonInv_grass_cover + 
+                (1 + z_nonInv_grass_cover|ProjectName), 
+              data = sdata_BLM)
+summary(model)
+hist(resid(model)) # Looks great
+```
+
+Bayesian model
+```{r, eval = FALSE}
+modelb_nonInv_grass_cover <- brm(z_soil_stab ~ z_nonInv_grass_cover +
+                          (1 + z_nonInv_grass_cover|ProjectName),
+                        data = sdata_BLM,
+                        chains = 2, cores = 2) # you can do more but 2 chains will be fine
+
+# Save models
+saveRDS(modelb_nonInv_grass_cover, "modelb_nonInv_grass_cover.rds")
+
+```
+
+```{r}
+# Load models
+modelb_nonInv_grass_cover <- readRDS("modelb_nonInv_grass_cover.rds")
+```
+
+
+```{r}
+# get all posterior samples
+post <- posterior_samples(modelb_nonInv_grass_cover)
+# names(post)
+
+# we get what we need - for random effect
+# V_rep <-post$sd_Replicate__Intercept^2 # making it variance
+V_site <-post$sd_ProjectName__Intercept^2 + post$sd_ProjectName__z_nonInv_grass_cover^2
+V_res <- post$sigma^2 
+```
+
+
+```{r}
+## Calculate variance for fixed effects
+
+# get a data frame of different posterior of fixed effects
+post_fix <- as.data.frame(t(post[,1:2]))
+
+# get a posterior of fixed effects
+V_fix <-  map_dbl(post_fix, ~ var(as.vector(. %*% t(model@pp$X))) )
+
+# mcmc object (from coda package)
+post_mat <- as.mcmc(data.frame(V_site, V_res, V_fix, row.names = NULL))
+
+summary(post_mat)
+plot(post_mat)
+
+# Calculate proportions from posterior
+post_mat %>% 
+  data.frame %>% 
+  mutate(V_all = V_site + V_res + V_fix,
+         # P_rep = V_rep/(V_rep + V_site + V_res + V_fix),
+         P_site = V_site/(V_site + V_res + V_fix),
+         P_res = V_res/(V_site + V_res + V_fix),
+         P_fix = V_fix/(V_site + V_res + V_fix),
+         P_all = P_site + P_res + P_fix)          ->  post_mat2_nonInv_grass_cover
+
+```
+
+
+
+
+
+### Non-Invasive Forb Cover
+
+Check model residuals
+```{r}
+# random slope model (using lmer)
+model <- lmer(z_soil_stab ~ z_nonInv_forb_cover + 
+                (1 + z_nonInv_forb_cover|ProjectName), 
+              data = sdata_BLM)
+summary(model)
+hist(resid(model)) # Looks great
+```
+
+
+Bayesian model
+```{r, eval = F}
+modelb_nonInv_forb_cover <- brm(z_soil_stab ~ z_nonInv_forb_cover +
+                          (1 + z_nonInv_forb_cover|ProjectName),
+                        data = sdata_BLM,
+                        chains = 2, cores = 2) # you can do more but 2 chains will be fine
+
+# Save models
+saveRDS(modelb_nonInv_forb_cover, "modelb_nonInv_forb_cover.rds")
+
+```
+
+```{r}
+# Load models
+modelb_nonInv_forb_cover <- readRDS("modelb_nonInv_forb_cover.rds")
+```
+
+
+```{r}
+# get all posterior samples
+post <- posterior_samples(modelb_nonInv_forb_cover)
+# names(post)
+
+# we get what we need - for random effect
+# V_rep <-post$sd_Replicate__Intercept^2 # making it variance
+V_site <-post$sd_ProjectName__Intercept^2 + post$sd_ProjectName__z_nonInv_forb_cover^2
+V_res <- post$sigma^2 
+```
+
+
+```{r}
+## Calculate variance for fixed effects
+
+# get a data frame of different posterior of fixed effects
+post_fix <- as.data.frame(t(post[,1:2]))
+
+# get a posterior of fixed effects
+V_fix <-  map_dbl(post_fix, ~ var(as.vector(. %*% t(model@pp$X))) )
+
+# mcmc object (from coda package)
+post_mat <- as.mcmc(data.frame(V_site, V_res, V_fix, row.names = NULL))
+
+summary(post_mat)
+plot(post_mat)
+
+# Calculate proportions from posterior
+post_mat %>% 
+  data.frame %>% 
+  mutate(V_all = V_site + V_res + V_fix,
+         # P_rep = V_rep/(V_site + V_res + V_fix),
+         P_site = V_site/(V_site + V_res + V_fix),
+         P_res = V_res/(V_site + V_res + V_fix),
+         P_fix = V_fix/(V_site + V_res + V_fix),
+         P_all = P_site + P_res + P_fix)          ->  post_mat2_nonInv_forb_cover
+
+```
+
+
+
+
+
+### Non-Invasive Shrub Cover
+
+Check model residuals
+```{r}
+# random slope model (using lmer)
+model <- lmer(z_soil_stab ~ z_nonInv_shrub_cover + 
+                (1 + z_nonInv_shrub_cover|ProjectName), 
+              data = sdata_BLM)
+summary(model)
+hist(resid(model)) # Looks great
+```
+
+
+Bayesian model
+```{r, eval = FALSE}
+modelb_nonInv_shrub_cover <- brm(z_soil_stab ~ z_nonInv_shrub_cover +
+                          (1 + z_nonInv_shrub_cover|ProjectName),
+                        data = sdata_BLM,
+                        chains = 2, cores = 2) # you can do more but 2 chains will be fine
+
+# Save models
+saveRDS(modelb_nonInv_shrub_cover, "modelb_nonInv_shrub_cover.rds")
+
+```
+
+```{r}
+# Load models
+modelb_nonInv_shrub_cover <- readRDS("modelb_nonInv_shrub_cover.rds")
+```
+
+
+```{r}
+# get all posterior samples
+post <- posterior_samples(modelb_nonInv_shrub_cover)
+# names(post)
+
+# we get what we need - for random effect
+# V_rep <-post$sd_Replicate__Intercept^2 # making it variance
+V_site <-post$sd_ProjectName__Intercept^2 + post$sd_ProjectName__z_nonInv_shrub_cover^2
+V_res <- post$sigma^2 
+```
+
+
+```{r}
+## Calculate variance for fixed effects
+
+# get a data frame of different posterior of fixed effects
+post_fix <- as.data.frame(t(post[,1:2]))
+
+# get a posterior of fixed effects
+V_fix <-  map_dbl(post_fix, ~ var(as.vector(. %*% t(model@pp$X))) )
+
+# mcmc object (from coda package)
+post_mat <- as.mcmc(data.frame(V_site, V_res, V_fix, row.names = NULL))
+
+summary(post_mat)
+plot(post_mat)
+
+# Calculate proportions from posterior
+post_mat %>% 
+  data.frame %>% 
+  mutate(V_all = V_site + V_res + V_fix,
+         # P_rep = V_rep/(V_rep + V_site + V_res + V_fix),
+         P_site = V_site/(V_site + V_res + V_fix),
+         P_res = V_res/(V_site + V_res + V_fix),
+         P_fix = V_fix/(V_site + V_res + V_fix),
+         P_all = P_site + P_res + P_fix)          ->  post_mat2_nonInv_shrub_cover
+
+```
+
+
+
+
+
+
+
+### Sagebrush Cover
+
+Check model residuals
+```{r}
+# random slope model (using lmer)
+model <- lmer(z_soil_stab ~ z_sagebrush_cover + 
+                (1 + z_sagebrush_cover|ProjectName), 
+              data = sdata_BLM)
+summary(model)
+hist(resid(model)) # Looks great
+```
+
+
+Bayesian model
+```{r, eval = FALSE}
+modelb_sagebrush_cover <- brm(z_soil_stab ~ z_sagebrush_cover +
+                          (1 + z_sagebrush_cover|ProjectName),
+                        data = sdata_BLM,
+                        chains = 2, cores = 2) # you can do more but 2 chains will be fine
+
+# Save models
+saveRDS(modelb_sagebrush_cover, "modelb_sagebrush_cover.rds")
+
+```
+
+```{r}
+# Load models
+modelb_sagebrush_cover <- readRDS("modelb_sagebrush_cover.rds")
+```
+
+```{r}
+# get all posterior samples
+post <- posterior_samples(modelb_sagebrush_cover)
+# names(post)
+
+# we get what we need - for random effect
+# V_rep <-post$sd_Replicate__Intercept^2 # making it variance
+V_site <-post$sd_ProjectName__Intercept^2 + post$sd_ProjectName__z_sagebrush_cover^2
+V_res <- post$sigma^2 
+```
+
+
+```{r}
+## Calculate variance for fixed effects
+
+# get a data frame of different posterior of fixed effects
+post_fix <- as.data.frame(t(post[,1:2]))
+
+# get a posterior of fixed effects
+V_fix <-  map_dbl(post_fix, ~ var(as.vector(. %*% t(model@pp$X))) )
+
+# mcmc object (from coda package)
+post_mat <- as.mcmc(data.frame(V_site, V_res, V_fix, row.names = NULL))
+
+summary(post_mat)
+plot(post_mat)  # This model has a bit of difficulty
+
+# Calculate proportions from posterior
+post_mat %>% 
+  data.frame %>% 
+  mutate(V_all = V_site + V_res + V_fix,
+         P_site = V_site/(V_site + V_res + V_fix),
+         P_res = V_res/(V_site + V_res + V_fix),
+         P_fix = V_fix/(V_site + V_res + V_fix),
+         P_all = P_site + P_res + P_fix)          ->  post_mat2_sagebrush_cover
+
+```
+
+
+
+
+
+
+
+### Invasive Annual Grass Cover
+
+Check model residuals
+```{r}
+# random slope model (using lmer)
+model <- lmer(z_soil_stab ~ z_inv_ann_grass_cover + 
+                (1 + z_inv_ann_grass_cover|ProjectName), 
+              data = sdata_BLM)
+summary(model)
+hist(resid(model)) # Looks great
+```
+
+
+Bayesian model
+```{r, eval = FALSE}
+modelb_inv_ann_grass_cover <- brm(z_soil_stab ~ z_inv_ann_grass_cover +
+                          (1 + z_inv_ann_grass_cover|ProjectName),
+                        data = sdata_BLM,
+                        chains = 2, cores = 2) # you can do more but 2 chains will be fine
+
+# Save models
+saveRDS(modelb_inv_ann_grass_cover, "modelb_inv_ann_grass_cover.rds")
+
+```
+
+```{r}
+# Load models
+modelb_inv_ann_grass_cover <- readRDS("modelb_inv_ann_grass_cover.rds")
+```
+
+```{r}
+# get all posterior samples
+post <- posterior_samples(modelb_inv_ann_grass_cover)
+# names(post)
+
+# we get what we need - for random effect
+V_site <-post$sd_ProjectName__Intercept^2 + post$sd_ProjectName__z_inv_ann_grass_cover^2
+V_res <- post$sigma^2 
+```
+
+
+```{r}
+## Calculate variance for fixed effects
+
+# get a data frame of different posterior of fixed effects
+post_fix <- as.data.frame(t(post[,1:2]))
+
+# get a posterior of fixed effects
+V_fix <-  map_dbl(post_fix, ~ var(as.vector(. %*% t(model@pp$X))) )
+
+# mcmc object (from coda package)
+post_mat <- as.mcmc(data.frame(V_site, V_res, V_fix, row.names = NULL))
+
+summary(post_mat)
+plot(post_mat)
+
+# Calculate proportions from posterior
+post_mat %>% 
+  data.frame %>% 
+  mutate(V_all = V_site + V_res + V_fix,
+         P_site = V_site/(V_site + V_res + V_fix),
+         P_res = V_res/(V_site + V_res + V_fix),
+         P_fix = V_fix/(V_site + V_res + V_fix),
+         P_all = P_site + P_res + P_fix)          ->  post_mat2_inv_ann_grass_cover
+
+```
+
+
+
+
+
+
+
+
+### Invasive Annual Forb/Grass Cover
+
+Check model residuals
+```{r}
+# random slope model (using lmer)
+model <- lmer(z_soil_stab ~ z_inv_ann_forb_cover + 
+                (1 + z_inv_ann_forb_cover|ProjectName), 
+              data = sdata_BLM)
+summary(model)
+hist(resid(model)) # Looks great
+```
+
+
+Bayesian model
+```{r, eval = FALSE}
+modelb_inv_ann_forb_cover <- brm(z_soil_stab ~ z_inv_ann_forb_cover +
+                          (1 + z_inv_ann_forb_cover|ProjectName),
+                        data = sdata_BLM,
+                        chains = 2, cores = 2) # you can do more but 2 chains will be fine
+
+# Save models
+saveRDS(modelb_inv_ann_forb_cover, "modelb_inv_ann_forb_cover.rds")
+
+```
+
+```{r}
+# Load models
+modelb_inv_ann_forb_cover <- readRDS("modelb_inv_ann_forb_cover.rds")
+```
+
+```{r}
+# get all posterior samples
+post <- posterior_samples(modelb_inv_ann_forb_cover)
+# names(post)
+
+# we get what we need - for random effect
+V_site <-post$sd_ProjectName__Intercept^2 + post$sd_ProjectName__z_inv_ann_forb_cover^2
+V_res <- post$sigma^2 
+```
+
+
+```{r}
+## Calculate variance for fixed effects
+
+# get a data frame of different posterior of fixed effects
+post_fix <- as.data.frame(t(post[,1:2]))
+
+# get a posterior of fixed effects
+V_fix <-  map_dbl(post_fix, ~ var(as.vector(. %*% t(model@pp$X))) )
+
+# mcmc object (from coda package)
+post_mat <- as.mcmc(data.frame(V_site, V_res, V_fix, row.names = NULL))
+
+summary(post_mat)
+plot(post_mat) # Some huge tails on these estimates, likely due to small fixed effects
+
+# Calculate proportions from posterior
+post_mat %>% 
+  data.frame %>% 
+  mutate(V_all = V_site + V_res + V_fix,
+         P_site = V_site/(V_site + V_res + V_fix),
+         P_res = V_res/(V_site + V_res + V_fix),
+         P_fix = V_fix/(V_site + V_res + V_fix),
+         P_all = P_site + P_res + P_fix)          ->  post_mat2_inv_ann_forb_cover
+
+```
+
+
+
+
+
+### Total Foliar Cover
+
+Check model residuals
+```{r}
+# random slope model (using lmer)
+model <- lmer(z_soil_stab ~ z_total_foliar_cover + 
+                (1 + z_total_foliar_cover|ProjectName), 
+              data = sdata_BLM)
+summary(model)
+hist(resid(model)) # Looks great
+```
+
+
+Bayesian model
+```{r, eval = FALSE}
+modelb_total_foliar_cover <- brm(z_soil_stab ~ z_total_foliar_cover +
+                          (1 + z_total_foliar_cover|ProjectName),
+                        data = sdata_BLM,
+                        chains = 2, cores = 2) # you can do more but 2 chains will be fine
+
+# Save models
+saveRDS(modelb_total_foliar_cover, "modelb_total_foliar_cover.rds")
+
+```
+
+```{r}
+# Load models
+modelb_total_foliar_cover <- readRDS("modelb_total_foliar_cover.rds")
+```
+
+```{r}
+# get all posterior samples
+post <- posterior_samples(modelb_total_foliar_cover)
+# names(post)
+
+# we get what we need - for random effect
+V_site <-post$sd_ProjectName__Intercept^2 + post$sd_ProjectName__z_total_foliar_cover^2
+V_res <- post$sigma^2 
+```
+
+
+```{r}
+## Calculate variance for fixed effects
+
+# get a data frame of different posterior of fixed effects
+post_fix <- as.data.frame(t(post[,1:2]))
+
+# get a posterior of fixed effects
+V_fix <-  map_dbl(post_fix, ~ var(as.vector(. %*% t(model@pp$X))) )
+
+# mcmc object (from coda package)
+post_mat <- as.mcmc(data.frame(V_site, V_res, V_fix, row.names = NULL))
+
+summary(post_mat)
+plot(post_mat)
+
+# Calculate proportions from posterior
+post_mat %>% 
+  data.frame %>% 
+  mutate(V_all = V_site + V_res + V_fix,
+         P_site = V_site/(V_site + V_res + V_fix),
+         P_res = V_res/(V_site + V_res + V_fix),
+         P_fix = V_fix/(V_site + V_res + V_fix),
+         P_all = P_site + P_res + P_fix)          ->  post_mat2_total_foliar_cover
+
+```
+
+### Others
+
+Tim also named 'Soil Stability Protected Surface Rating' vs 'Soil Stability Unprotected Surface Rating' as a possble variable combination.  
+  
+Not sure if this needs to be added (though my intuitions tell me probably not)
+
+
+<br>
+
+***
+
+<br>
+
+
+## Means & SDs
+
+Average variance components across all variables within NutNet data set
+```{r}
+# finding average proportions of all variables
+mean_P_site <- ((post_mat2_nonInv_grass_cover$P_site + 
+                  post_mat2_nonInv_forb_cover$P_site + 
+                  post_mat2_nonInv_shrub_cover$P_site + 
+                  post_mat2_sagebrush_cover$P_site + 
+                  post_mat2_inv_ann_grass_cover$P_site + 
+                  post_mat2_inv_ann_forb_cover$P_site + 
+                  post_mat2_total_foliar_cover$P_site) / 7)
+mean_P_res <- ((post_mat2_nonInv_grass_cover$P_res + 
+                  post_mat2_nonInv_forb_cover$P_res + 
+                  post_mat2_nonInv_shrub_cover$P_res + 
+                  post_mat2_sagebrush_cover$P_res + 
+                  post_mat2_inv_ann_grass_cover$P_res + 
+                  post_mat2_inv_ann_forb_cover$P_res + 
+                  post_mat2_total_foliar_cover$P_res) / 7)
+mean_P_fix <- ((post_mat2_nonInv_grass_cover$P_fix + 
+                  post_mat2_nonInv_forb_cover$P_fix + 
+                  post_mat2_nonInv_shrub_cover$P_fix + 
+                  post_mat2_sagebrush_cover$P_fix + 
+                  post_mat2_inv_ann_grass_cover$P_fix + 
+                  post_mat2_inv_ann_forb_cover$P_fix + 
+                  post_mat2_total_foliar_cover$P_fix) / 7)
+
+
+propPost_BLM <- as.data.frame(cbind(mean_P_site, 
+                                    mean_P_res, mean_P_fix))
+```
+
+```{r}
+propPost_BLM %>% 
+  pivot_longer(everything(), values_to = "Variance") %>% 
+  group_by(name) %>%
+  summarise_all(.funs = c(Mean = "mean", sd = "sd"))
+```
+
+
+<br>
+
+***
+
+<br>
+
+
+
+## PLOTS
+
+### Bayes model
+Create data frames of variance components
+```{r}
+# Function to create data frames
+create_bayesVarTable <- function(posteriorVarianceDF, variableName) {
+  # make variable name usable for character
+  varName <- as.character(variableName)
+  
+  # build data frame
+  dataFrame <- posteriorVarianceDF %>% 
+  mutate(
+    iteration = 1:length(posteriorVarianceDF$P_all), # make a col to represent each test
+    Variable = as.factor(paste(variableName))         # add Variable name
+  ) %>%
+  select(P_site, P_res, P_fix, iteration, Variable) %>%
+  pivot_longer(c(-Variable, -iteration), values_to = "Variance") # flip the table
+}
+
+propPost_nonInv_grass_cover <- create_bayesVarTable(post_mat2_nonInv_grass_cover, "nonInv_grass_cover")
+propPost_nonInv_forb_cover <- create_bayesVarTable(post_mat2_nonInv_forb_cover, "nonInv_forb_cover")
+propPost_nonInv_shrub_cover <- create_bayesVarTable(post_mat2_nonInv_shrub_cover, "nonInv_shrub_cover")
+propPost_sagebrush_cover <- create_bayesVarTable(post_mat2_sagebrush_cover, "sagebrush_cover")
+propPost_inv_ann_grass_cover <- create_bayesVarTable(post_mat2_inv_ann_grass_cover, "inv_ann_grass_cover")
+propPost_inv_ann_forb_cover <- create_bayesVarTable(post_mat2_inv_ann_forb_cover, "inv_ann_forb_cover")
+propPost_total_foliar_cover <- create_bayesVarTable(post_mat2_total_foliar_cover, "total_foliar_cover")
+
+
+# Combine
+propPost_BLM <- as.data.frame(rbind(propPost_nonInv_grass_cover, propPost_nonInv_forb_cover,
+                                propPost_nonInv_shrub_cover, propPost_sagebrush_cover,
+                                propPost_inv_ann_grass_cover, propPost_inv_ann_forb_cover,
+                                propPost_total_foliar_cover))
+```
+
+
+
+```{r}
+# Rename variables for plotting
+propPost_BLM <- propPost_BLM %>%
+    mutate(
+    name = as.factor(recode(name,
+                        "P_fix" = "Fixed",
+                        "P_res" = "Residual",
+                        "P_site" = "Location")),
+    Variable = as.factor(recode(Variable,
+                                "nonInv_grass_cover" = "Non-inv. Grass Cover",
+                                "nonInv_forb_cover" = "Non-inv. Forb Cover",
+                                "nonInv_shrub_cover" = "Non-inv. Shrub Cover",
+                                "inv_ann_grass_cover" = "Inv. Grass Cover",
+                                "inv_ann_forb_cover" = "Inv. Forb Cover",
+                                "total_foliar_cover" = "Foliar Cover",
+                                "sagebrush_cover" = "Sagebrush Cover"))
+  ) %>%
+       arrange_at(4, desc) %>%
+     arrange(match(name, c("Location", "Residual", "Fixed")))
+
+# calculate mean & SE values
+propPost_BLM.sem <-
+  propPost_BLM %>% 
+  dplyr::group_by(name, Variable) %>%
+  summarise(mean = mean(Variance),
+            sem = sd(Variance),
+            upper = mean+sem,
+            lower = mean-sem)
+
+# rearrange order of variables
+propPost_BLM.sem <- propPost_BLM.sem %>%
+     arrange_at(4, desc) %>%
+     arrange(match(name, c("Location", "Residual", "Fixed")))
+
+propPost_BLM.sem
+
+# Convert SE values to cumulative sums for plotting purposes
+propPost_BLM.sem2 <- within(propPost_BLM.sem,mean2 <- ave(mean,Variable, FUN=cumsum))
+
+propPost_BLM.sem2 %>% filter(Variable == "Sagebrush Cover")
+```
+
+
+Stacked Bar Plot
+```{r}
+plot1_BLM <- 
+  propPost_BLM.sem2 %>% mutate(
+    Component = factor(name, levels=c("Fixed", "Residual", "Location"))) %>% 
+  
+  ggplot(aes(x = Variable, 
+             y = mean, 
+             fill = Component, colour = Component)) + 
+  geom_bar(stat = "identity", width = .4, alpha = .8) +
+  coord_cartesian(ylim = c(0, 1)) + 
+  scale_y_continuous(labels = scales::percent) + 
+  coord_flip() +
+  labs(x = "Outcome Variables",
+       y = "Proportion of Total Variance") +
+  scale_fill_ptol() + scale_colour_ptol() + 
+  theme_minimal() + 
+  theme(legend.position = "top")
+```
+
+
+
+Side-by-side bar plots of individual variance components
+```{r}
+plot2_BLM <- propPost_BLM %>% mutate(
+  name = factor(name, levels=c("Fixed", "Residual", "Location"))) %>% 
+  
+  ggplot(aes(x = Variable, y = Variance, fill = name, colour = name)) + 
+  facet_grid(rows = vars(name)) +
+  stat_summary(fun.y = mean, geom = "bar", position = "dodge",width = 1, alpha = .8) +
+  stat_summary(fun.data = mean_cl_normal, geom = "errorbar", 
+               width = 0.15, position = position_dodge(width = 0.90), colour = "black") +
+  scale_y_continuous(labels = scales::percent) +
+  labs(x = "Outcome Variables",
+       y = "Proportion of Total Variance") +
+  scale_fill_ptol() + scale_colour_ptol() + coord_flip(ylim = c(0,1)) +
+  theme_minimal() + 
+  theme(legend.position = "none",
+        strip.text.y = element_text(angle = 0, size = 8))
+        # axis.text.x = element_text(angle = -90, hjust = 0)) 
+```
+
+*Variance Components Plots (Bayes)*
+```{r}
+library(patchwork)
+
+plot1_BLM + plot2_BLM + plot_layout(widths = c(2, 1))
+```
+
+
+```{r, eval = FALSE, echo = FALSE}
+ggsave("plot_BLM.tiff",
+ plot = last_plot(), # or give ggplot object name as in myPlot,
+ width = 8, height = 5,
+ units = "in", # other options c("in", "cm", "mm"),
+ dpi = 600)
+```
+
+
+## Site Locations
+```{r}
+library(sf)
+library("rnaturalearth")
+library("rnaturalearthdata")
+
+world <- ne_countries(scale = "medium", returnclass = "sf")
+library(tidyverse)
+ggplot(data = world) +
+    geom_sf() +
+    geom_point(data = (data_BLM %>% 
+                         select(ProjectName, Longitude, Latitude) %>%
+                         unique()), 
+               aes(x = Longitude, y = Latitude), size = 1, 
+               shape = 21, fill = "red") +
+    coord_sf(xlim = c(-180, 120), ylim = c(-80, 80), expand = FALSE) + 
+  theme_bw()
+```
+
+
+
+# Biodiversity x Drought
+```{r}
+data_biomass %>% glimpse()
+data_biomass %>% head(5)
+```
+
+
+# Replicated Models from Papers
+
+## Anderson et al. (2018)
+They use Log Response Ratio of total NPK between Control & Fertilizer treatment as Dependent Variable
+```{r}
+# get sum of DV
+table_NPK_Fert <- data_NutNet %>% 
+  group_by(SITE, NPK.ADDED, FENCE, MAP, MAT, SOLAR.INS, N.DEPOSITION) %>% 
+  select(SITE, NPK.ADDED, plant.NPK, plant.N, plant.P, plant.K) %>%
+  summarise(total.NPK = sum(plant.NPK))
+
+# Prepare table for pivot_wider()
+table_NPK_Fert$NPK.ADDED <- as.character(table_NPK_Fert$NPK.ADDED)
+table_NPK_Fert$NPK.ADDED <- recode(table_NPK_Fert$NPK.ADDED, "0" = "Control", '1' = "Fertilizer")
+
+# Calulate Log Response Ratio of DV (Control vs Fertilizer effect)
+table_NPK_Fert <- 
+  table_NPK_Fert %>% 
+  pivot_wider(names_from = NPK.ADDED, values_from = total.NPK) %>%
+  group_by(SITE) %>%
+  mutate(
+    LRR_Fertilizer = log(Fertilizer/Control)
+  )
+```
+
+```{r}
+# Anderson et al. model
+model <- lm(LRR_Fertilizer ~ FENCE + MAT + MAT + SOLAR.INS + N.DEPOSITION + FENCE:MAT, 
+              data = table_NPK_Fert)
+
+anova(model)
+summary(model)
+```
+
+
+
+## Milcu et al. (2018)
+#### Their model
+```{r}
+model <- lmer(biomass_Seed ~ Legume * Lab * CSV + 
+                (1|Block/Method.comm), 
+                data = data_CSV)
+```
