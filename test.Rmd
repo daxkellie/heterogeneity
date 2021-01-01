@@ -1,7 +1,7 @@
 ---
-title: "Biological Heterogeneity"
-author: "DK"
-date: "01/04/2020"
+title: "New analysis"
+author: "DK + SN"
+date: "01/01/2021"
 output:
   html_document:
     highlight: pygments
@@ -12,18 +12,27 @@ editor_options:
   chunk_output_type: inline
 ---
 
-```{r fresh list of bel air, echo = FALSE}
-rm(list=ls())
+```{r setup, include = FALSE}
+# knitr setting
+knitr::opts_chunk$set(
+  message = FALSE,
+  warning = FALSE, # no warnings
+  tidy = TRUE,
+  cache = TRUE
+)
+
+# clearing up
+rm(list = ls())
 ```
 
 ```{r packages, message = FALSE, warning = FALSE, error = FALSE}
-pacman::p_load(tidyverse, lme4, lmerTest, MuMIn, rstan, brms, rptR, tidybayes, coda,
-               sf, "rnaturalearth", "rnaturalearthdata", modelr, ggthemes, ggmcmc, MCMCglmm, metafor)
+pacman::p_load(tidyverse, lme4,  metafor)
 
 # helping running rstan (brms) models
+#options(mc.cores = parallel::detectCores())
+#rstan_options(auto_write = TRUE)
 
-options(mc.cores = parallel::detectCores())
-rstan_options(auto_write = TRUE)
+
 ```
 
 
@@ -32,7 +41,7 @@ rstan_options(auto_write = TRUE)
 ```{r}
 data_CSV <- read.csv("Datasets/CSV_microcosms/data/milcu_etal2017.csv", header = TRUE)
 data_NutNet <- read.csv("Datasets/NutNet/data/Model2.SEM.plot.data.csv", header = TRUE)
-data_biomass <- read.csv("Datasets/RichnessDrought/data/biomass_1.2.csv", header = TRUE)
+#data_biomass <- read.csv("Datasets/RichnessDrought/data/biomass_1.2.csv", header = TRUE)
 data_BLM <- read.csv("Datasets/BLM/terradat_points_table.csv")
 ```
 
@@ -75,10 +84,17 @@ plot_frequencyDist(data_NutNet, "TOTAL.AG.BIOMASS")
 ```
 
 ## Analysis
+
+### 
+
 create `REPLICATE` variable for analysis
 ```{r}
 # create REPLICATE variable for analysis
 data_NutNet$REPLICATE <- paste0(data_NutNet$SITE, data_NutNet$TREATMENT)
+
+# turning into meta-analytic data
+
+
 ```
 
 
